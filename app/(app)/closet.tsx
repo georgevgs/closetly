@@ -1,11 +1,6 @@
 import { useMemo, useState } from "react";
-import {
-  View,
-  Pressable,
-  ScrollView,
-  ActivityIndicator,
-  useColorScheme,
-} from "react-native";
+import { View, Pressable, ScrollView, ActivityIndicator } from "react-native";
+import { useColorScheme } from "nativewind";
 import { FlashList } from "@shopify/flash-list";
 import { router } from "expo-router";
 import { SymbolView } from "expo-symbols";
@@ -14,7 +9,6 @@ import * as Haptics from "expo-haptics";
 import { Screen } from "~/components/ui/Screen";
 import { Text } from "~/components/ui/Text";
 import { Pill } from "~/components/ui/Pill";
-import { GlassSurface } from "~/components/ui/GlassSurface";
 import { ItemCard } from "~/features/closet/components/ItemCard";
 import { useSignedItems } from "~/features/closet/hooks/useSignedItems";
 import { useAuth } from "~/features/auth/context";
@@ -44,9 +38,9 @@ export default function ClosetScreen() {
   const { data: items, isLoading } = useSignedItems(session?.user.id);
   const [filter, setFilter] = useState<Category | "all">("all");
   const [sort, setSort] = useState<SortMode>("newest");
-  const scheme = useColorScheme();
-  const fg = scheme === "dark" ? "#f5f3ef" : "#1a1a1a";
-  const onInk = scheme === "dark" ? "#1a1a1a" : "#faf8f5";
+  const { colorScheme } = useColorScheme();
+  const fg = colorScheme === "dark" ? "#f5f3ef" : "#1a1a1a";
+  const onInk = colorScheme === "dark" ? "#0e0e0d" : "#faf8f5";
 
   const sorted = useMemo(() => {
     if (!items) return [];
@@ -92,21 +86,9 @@ export default function ClosetScreen() {
               router.push("/items/new");
             }}
             hitSlop={12}
+            className="h-11 w-11 rounded-full bg-ink dark:bg-ink-dark items-center justify-center"
           >
-            <GlassSurface
-              isInteractive
-              style={{
-                height: 44,
-                width: 44,
-                borderRadius: 22,
-                alignItems: "center",
-                justifyContent: "center",
-                overflow: "hidden",
-              }}
-              fallbackClassName="bg-ink/90 dark:bg-ink-dark/90"
-            >
-              <SymbolView name="plus" size={20} tintColor={onInk} />
-            </GlassSurface>
+            <SymbolView name="plus" size={20} tintColor={onInk} />
           </Pressable>
         </View>
       </View>

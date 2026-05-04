@@ -3,7 +3,7 @@ import "react-native-reanimated";
 import "../global.css";
 
 import { useEffect } from "react";
-import { useColorScheme } from "react-native";
+import { useColorScheme } from "nativewind";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -12,6 +12,7 @@ import { Toaster } from "sonner-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { QueryProvider } from "~/providers/QueryProvider";
+import { ThemeProvider } from "~/providers/ThemeProvider";
 import { AuthProvider, useAuth } from "~/features/auth/context";
 
 export const unstable_settings = {
@@ -54,19 +55,21 @@ function AuthGate() {
 }
 
 export default function RootLayout() {
-  const scheme = useColorScheme();
+  const { colorScheme } = useColorScheme();
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <QueryProvider>
-          <AuthProvider>
-            <BottomSheetModalProvider>
-              <AuthGate />
-              <Toaster theme={scheme === "dark" ? "dark" : "light"} position="top-center" />
-              <StatusBar style="auto" />
-            </BottomSheetModalProvider>
-          </AuthProvider>
-        </QueryProvider>
+        <ThemeProvider>
+          <QueryProvider>
+            <AuthProvider>
+              <BottomSheetModalProvider>
+                <AuthGate />
+                <Toaster theme={colorScheme === "dark" ? "dark" : "light"} position="top-center" />
+                <StatusBar style="auto" />
+              </BottomSheetModalProvider>
+            </AuthProvider>
+          </QueryProvider>
+        </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
