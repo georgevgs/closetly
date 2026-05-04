@@ -1,0 +1,10 @@
+{
+  "name": "expo-bg-remover",
+  "version": "0.1.0",
+  "description": "Background removal via Apple Vision (iOS 17+).",
+  "main": "index.ts",
+  "types": "index.ts",
+  "private": true,
+  "keywords": ["react-native", "expo", "vision", "background-removal"],
+  "license": "MIT"
+}

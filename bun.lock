@@ -17,6 +17,7 @@
         "@tanstack/react-query": "^5.100.9",
         "clsx": "^2.1.1",
         "expo": "~55.0.0",
+        "expo-bg-remover": "file:./modules/expo-bg-remover",
         "expo-blur": "~55.0.14",
         "expo-constants": "~55.0.15",
         "expo-crypto": "~55.0.14",
@@ -971,6 +972,8 @@
     "expo": ["expo@55.0.19", "", { "dependencies": { "@babel/runtime": "^7.20.0", "@expo/cli": "55.0.27", "@expo/config": "~55.0.15", "@expo/config-plugins": "~55.0.8", "@expo/devtools": "55.0.2", "@expo/fingerprint": "0.16.6", "@expo/local-build-cache-provider": "55.0.11", "@expo/log-box": "55.0.11", "@expo/metro": "~55.1.1", "@expo/metro-config": "55.0.18", "@expo/vector-icons": "^15.0.2", "@ungap/structured-clone": "^1.3.0", "babel-preset-expo": "~55.0.19", "expo-asset": "~55.0.16", "expo-constants": "~55.0.15", "expo-file-system": "~55.0.17", "expo-font": "~55.0.6", "expo-keep-awake": "~55.0.7", "expo-modules-autolinking": "55.0.19", "expo-modules-core": "55.0.24", "pretty-format": "^29.7.0", "react-refresh": "^0.14.2", "whatwg-url-minimum": "^0.1.1" }, "peerDependencies": { "@expo/dom-webview": "*", "@expo/metro-runtime": "*", "react": "*", "react-native": "*", "react-native-webview": "*" }, "optionalPeers": ["@expo/dom-webview", "@expo/metro-runtime", "react-native-webview"], "bin": { "expo": "bin/cli", "fingerprint": "bin/fingerprint", "expo-modules-autolinking": "bin/autolinking" } }, "sha512-8nTbChg2vy7aNsX5F7KiSb552YP7dc4eD89+UjCKlFPQg4Dw7RyjYuXgFBU7ADw2JjTHl848jFLyT6nvqNROgg=="],
 
     "expo-asset": ["expo-asset@55.0.16", "", { "dependencies": { "@expo/image-utils": "^0.8.13", "expo-constants": "~55.0.15" }, "peerDependencies": { "expo": "*", "react": "*", "react-native": "*" } }, "sha512-5IJyfJtYqvKGg04NKGQWiCIoK/fULDL9m15mXPPyfabD1jsToVj2hnWmo1r2SWNNmMwtQxi6jTpcGwVo2nLDxg=="],
+
+    "expo-bg-remover": ["expo-bg-remover@file:modules/expo-bg-remover", {}],
 
     "expo-blur": ["expo-blur@55.0.14", "", { "peerDependencies": { "expo": "*", "react": "*", "react-native": "*" } }, "sha512-NKyCKFWTNpX4CZSsiE1sgkqk/yvR1K0UTukuIbxVKoobB+yALLg1CFav0NqfdQqjhtoj5oEzP0Brlq92Z08Zfg=="],
 

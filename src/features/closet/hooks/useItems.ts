@@ -83,13 +83,21 @@ export function useUpdateItem() {
 export function useReplaceItemPhoto() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, photoUri }: { id: string; photoUri: string }) => {
+    mutationFn: async ({
+      id,
+      photoUri,
+      analysisUri,
+    }: {
+      id: string;
+      photoUri: string;
+      analysisUri?: string;
+    }) => {
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData.user?.id;
       if (!userId) throw new Error("Not authenticated");
 
       await uploadItemImage(photoUri, userId, id);
-      const visionAttrs = await analyzeItemFromUri(photoUri);
+      const visionAttrs = await analyzeItemFromUri(analysisUri ?? photoUri);
       const colors = visionColorsToItemColors(visionAttrs.colors);
 
       const { error } = await supabase

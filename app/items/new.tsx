@@ -25,6 +25,7 @@ import {
 } from "~/lib/color/extract";
 import { useCreateItem } from "~/features/closet/hooks/useCreateItem";
 import { analyzeItemFromUri } from "~/features/closet/vision";
+import { isBgRemovalAvailable, removeBackground } from "expo-bg-remover";
 import { useCategoryPrefs } from "~/providers/CategoryPrefsProvider";
 import {
   CATEGORIES,
@@ -58,10 +59,12 @@ export default function NewItemScreen() {
   const [warmth, setWarmth] = useState<Warmth>(2);
 
   const [analyzing, setAnalyzing] = useState(false);
+  const [trimming, setTrimming] = useState(false);
   const [autoFilled, setAutoFilled] = useState(false);
   const colorsTouchedRef = useRef(false);
   const visionAttrsRef = useRef<VisionAttrs | null>(null);
   const visionReqRef = useRef(0);
+  const trimReqRef = useRef(0);
 
   async function pickPhoto(source: "camera" | "library") {
     if (source === "camera") {
@@ -89,6 +92,22 @@ export default function NewItemScreen() {
     const uri = result.assets[0].uri;
     setPhotoUri(uri);
     runVision(uri);
+    runTrim(uri);
+  }
+
+  async function runTrim(originalUri: string) {
+    if (!isBgRemovalAvailable()) return;
+    const reqId = ++trimReqRef.current;
+    setTrimming(true);
+    try {
+      const trimmed = await removeBackground(originalUri);
+      if (reqId !== trimReqRef.current) return;
+      setPhotoUri((current) => (current === originalUri ? trimmed.uri : current));
+    } catch {
+      // No subject detected or Vision failed — keep original.
+    } finally {
+      if (reqId === trimReqRef.current) setTrimming(false);
+    }
   }
 
   async function runVision(uri: string) {
@@ -172,6 +191,12 @@ export default function NewItemScreen() {
           {photoUri ? (
             <View className="rounded-xl overflow-hidden bg-line dark:bg-line-dark" style={{ aspectRatio: 1 }}>
               <Image source={{ uri: photoUri }} style={{ flex: 1 }} contentFit="cover" />
+              {trimming && (
+                <View className="absolute inset-0 items-center justify-center bg-black/30">
+                  <ActivityIndicator color="#fff" />
+                  <Text className="text-white mt-2">Removing background…</Text>
+                </View>
+              )}
             </View>
           ) : (
             <View

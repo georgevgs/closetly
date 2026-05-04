@@ -16,17 +16,17 @@ export async function uploadItemImage(
 ): Promise<UploadResult> {
   const [full, thumb] = await Promise.all([
     manipulateAsync(uri, [{ resize: { width: MAX_SIZE } }], {
-      compress: 0.85,
-      format: SaveFormat.WEBP,
+      compress: 1,
+      format: SaveFormat.PNG,
     }),
     manipulateAsync(uri, [{ resize: { width: THUMB_SIZE } }], {
-      compress: 0.75,
-      format: SaveFormat.WEBP,
+      compress: 1,
+      format: SaveFormat.PNG,
     }),
   ]);
 
-  const photoPath = `${userId}/${itemId}/photo.webp`;
-  const thumbPath = `${userId}/${itemId}/thumb.webp`;
+  const photoPath = `${userId}/${itemId}/photo.png`;
+  const thumbPath = `${userId}/${itemId}/thumb.png`;
 
   const fullBuf = await fetchArrayBuffer(full.uri);
   const thumbBuf = await fetchArrayBuffer(thumb.uri);
@@ -34,10 +34,10 @@ export async function uploadItemImage(
   const [{ error: e1 }, { error: e2 }] = await Promise.all([
     supabase.storage
       .from("closet-photos")
-      .upload(photoPath, fullBuf, { contentType: "image/webp", upsert: true }),
+      .upload(photoPath, fullBuf, { contentType: "image/png", upsert: true }),
     supabase.storage
       .from("closet-photos")
-      .upload(thumbPath, thumbBuf, { contentType: "image/webp", upsert: true }),
+      .upload(thumbPath, thumbBuf, { contentType: "image/png", upsert: true }),
   ]);
 
   if (e1) throw e1;

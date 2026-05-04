@@ -12,6 +12,7 @@ import { Button } from "~/components/ui/Button";
 import { Pill } from "~/components/ui/Pill";
 import { useItem, useUpdateItem, useReplaceItemPhoto } from "~/features/closet/hooks/useItems";
 import { signItemUrls } from "~/features/closet/mapper";
+import { isBgRemovalAvailable, removeBackground } from "expo-bg-remover";
 import { useCategoryPrefs } from "~/providers/CategoryPrefsProvider";
 import {
   STYLES,
@@ -99,8 +100,22 @@ export default function EditItemScreen() {
             aspect: [1, 1],
           });
     if (result.canceled) return;
+    const original = result.assets[0].uri;
+    let photoUri = original;
+    if (isBgRemovalAvailable()) {
+      try {
+        const trimmed = await removeBackground(original);
+        photoUri = trimmed.uri;
+      } catch {
+        // No subject detected — fall back to original.
+      }
+    }
     try {
-      await replacePhoto.mutateAsync({ id: item.id, photoUri: result.assets[0].uri });
+      await replacePhoto.mutateAsync({
+        id: item.id,
+        photoUri,
+        analysisUri: original,
+      });
       toast.success("Photo replaced — colors updated");
     } catch (e) {
       const err = e as Error;
