@@ -1,11 +1,15 @@
 import { View, ScrollView, Pressable, ActivityIndicator, Alert } from "react-native";
 import { Image } from "expo-image";
-import { useLocalSearchParams, router } from "expo-router";
+import { Stack, useLocalSearchParams, router } from "expo-router";
+import { SymbolView } from "expo-symbols";
+import * as Haptics from "expo-haptics";
+import { useColorScheme } from "nativewind";
 
 import { Screen } from "~/components/ui/Screen";
 import { Text } from "~/components/ui/Text";
 import { Button } from "~/components/ui/Button";
 import { Pill } from "~/components/ui/Pill";
+import { GlassSurface } from "~/components/ui/GlassSurface";
 import { useItem, useDeleteItem } from "~/features/closet/hooks/useItems";
 import { signItemUrls } from "~/features/closet/mapper";
 import { useQuery } from "@tanstack/react-query";
@@ -14,6 +18,8 @@ export default function ItemDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: item, isLoading } = useItem(id);
   const del = useDeleteItem();
+  const { colorScheme } = useColorScheme();
+  const fg = colorScheme === "dark" ? "#f5f3ef" : "#1a1a1a";
 
   const { data: signed } = useQuery({
     queryKey: ["item-signed", item?.id],
@@ -40,6 +46,42 @@ export default function ItemDetail() {
 
   return (
     <Screen edges={["bottom"]}>
+      <Stack.Screen
+        options={{
+          title: display.name ?? "Item",
+          headerRight: () => (
+            <Pressable
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push(`/items/edit/${display.id}`);
+              }}
+              hitSlop={12}
+              accessibilityLabel="Edit item"
+              accessibilityRole="button"
+            >
+              <GlassSurface
+                isInteractive
+                style={{
+                  height: 36,
+                  width: 36,
+                  borderRadius: 18,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  overflow: "hidden",
+                }}
+                fallbackClassName="bg-canvas/70 dark:bg-canvas-dark/70 border border-line/60 dark:border-line-dark/60"
+              >
+                <SymbolView
+                  name="square.and.pencil"
+                  size={17}
+                  tintColor={fg}
+                  weight="semibold"
+                />
+              </GlassSurface>
+            </Pressable>
+          ),
+        }}
+      />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 20 }}>
         <View className="rounded-xl overflow-hidden" style={{ aspectRatio: 1 }}>
           <Image source={{ uri: display.photo_url }} style={{ flex: 1 }} contentFit="cover" />

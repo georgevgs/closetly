@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   View,
   ScrollView,
   Pressable,
   TextInput,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
@@ -19,9 +20,12 @@ import { Pill } from "~/components/ui/Pill";
 import {
   PRESET_PALETTE,
   buildPalette,
+  snapHexesToPresets,
   type Swatch,
 } from "~/lib/color/extract";
 import { useCreateItem } from "~/features/closet/hooks/useCreateItem";
+import { analyzeItemFromUri } from "~/features/closet/vision";
+import { useCategoryPrefs } from "~/providers/CategoryPrefsProvider";
 import {
   CATEGORIES,
   STYLES,
@@ -33,22 +37,31 @@ import {
   type Pattern,
   type Formality,
   type Warmth,
+  type VisionAttrs,
 } from "~/types/items";
 
 export default function NewItemScreen() {
   const create = useCreateItem();
+  const { visible: visibleCategories } = useCategoryPrefs();
+  const initialCategory: Category = visibleCategories[0] ?? CATEGORIES[0];
 
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [picks, setPicks] = useState<Swatch[]>([]);
   const palette = buildPalette(picks);
 
   const [name, setName] = useState("");
-  const [category, setCategory] = useState<Category>("top");
+  const [category, setCategory] = useState<Category>(initialCategory);
   const [styles, setStyles] = useState<Set<Style>>(new Set(["minimal"]));
   const [seasons, setSeasons] = useState<Set<Season>>(new Set(SEASONS));
   const [pattern, setPattern] = useState<Pattern>("solid");
   const [formality, setFormality] = useState<Formality>(3);
   const [warmth, setWarmth] = useState<Warmth>(2);
+
+  const [analyzing, setAnalyzing] = useState(false);
+  const [autoFilled, setAutoFilled] = useState(false);
+  const colorsTouchedRef = useRef(false);
+  const visionAttrsRef = useRef<VisionAttrs | null>(null);
+  const visionReqRef = useRef(0);
 
   async function pickPhoto(source: "camera" | "library") {
     if (source === "camera") {
@@ -73,10 +86,36 @@ export default function NewItemScreen() {
             aspect: [1, 1],
           });
     if (result.canceled) return;
-    setPhotoUri(result.assets[0].uri);
+    const uri = result.assets[0].uri;
+    setPhotoUri(uri);
+    runVision(uri);
+  }
+
+  async function runVision(uri: string) {
+    const reqId = ++visionReqRef.current;
+    setAnalyzing(true);
+    setAutoFilled(false);
+    try {
+      const attrs = await analyzeItemFromUri(uri);
+      if (reqId !== visionReqRef.current) return;
+      visionAttrsRef.current = attrs;
+      if (!colorsTouchedRef.current) {
+        const snapped = snapHexesToPresets(attrs.colors.map((c) => c.hex));
+        if (snapped.length > 0) {
+          setPicks(snapped);
+          setAutoFilled(true);
+        }
+      }
+    } catch {
+      // Best-effort. Manual color picking still works.
+    } finally {
+      if (reqId === visionReqRef.current) setAnalyzing(false);
+    }
   }
 
   function toggleSwatch(s: Swatch) {
+    colorsTouchedRef.current = true;
+    setAutoFilled(false);
     setPicks((prev) => {
       const exists = prev.find((p) => p.hex === s.hex);
       if (exists) return prev.filter((p) => p.hex !== s.hex);
@@ -108,6 +147,7 @@ export default function NewItemScreen() {
         formality,
         warmth,
         colors,
+        visionAttrs: visionAttrsRef.current,
       });
       toast.success("Added to closet");
       router.back();
@@ -163,7 +203,20 @@ export default function NewItemScreen() {
         {/* Colors */}
         <Section
           title="Colors"
-          subtitle="Tap up to 3 — first pick is the primary"
+          subtitle={
+            analyzing
+              ? "Picking colors from the photo…"
+              : autoFilled
+                ? "Auto-picked — tap to adjust"
+                : "Tap up to 3 — first pick is the primary"
+          }
+          accessory={
+            analyzing ? (
+              <ActivityIndicator size="small" />
+            ) : autoFilled ? (
+              <SymbolView name="sparkles" size={16} tintColor="#a8a29e" />
+            ) : null
+          }
         >
           <View className="flex-row flex-wrap gap-3">
             {PRESET_PALETTE.map((s) => {
@@ -209,7 +262,7 @@ export default function NewItemScreen() {
         {/* Category */}
         <Section title="Category">
           <View className="flex-row flex-wrap gap-2">
-            {CATEGORIES.map((c) => (
+            {visibleCategories.map((c) => (
               <Pill
                 key={c}
                 label={c}
@@ -304,17 +357,20 @@ export default function NewItemScreen() {
 function Section({
   title,
   subtitle,
+  accessory,
   children,
 }: {
   title: string;
   subtitle?: string;
+  accessory?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <View>
-      <Text variant="label" className="mb-1">
-        {title}
-      </Text>
+      <View className="flex-row items-center justify-between mb-1">
+        <Text variant="label">{title}</Text>
+        {accessory}
+      </View>
       {subtitle && (
         <Text variant="caption" className="mb-3">
           {subtitle}

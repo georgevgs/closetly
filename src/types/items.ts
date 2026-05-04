@@ -43,6 +43,23 @@ export type Warmth = 0 | 1 | 2 | 3 | 4;
 
 export type ItemColor = { hex: string; hsl: HSL };
 
+export type Silhouette = {
+  fit: "slim" | "regular" | "relaxed" | "oversized";
+  length?: "cropped" | "regular" | "long" | "na";
+  rise?: "high" | "mid" | "low" | "na";
+};
+
+export const STYLE_ADJACENCY: Record<Style, readonly Style[]> = {
+  minimal: ["classic", "elegant"],
+  classic: ["minimal", "elegant", "preppy"],
+  elegant: ["minimal", "classic", "preppy", "bohemian"],
+  preppy: ["classic", "elegant"],
+  streetwear: ["sporty", "edgy"],
+  sporty: ["streetwear", "edgy"],
+  edgy: ["streetwear", "sporty"],
+  bohemian: ["elegant"],
+} as const;
+
 export type Item = {
   id: string;
   user_id: string;
@@ -56,9 +73,14 @@ export type Item = {
   styles: Style[];
   warmth: Warmth;
   pattern: Pattern;
+  silhouette: Silhouette | null;
   brand: string | null;
   notes: string | null;
   created_at: string;
+};
+
+export type VisionAttrs = {
+  colors: { hex: string }[];
 };
 
 export type Outfit = {

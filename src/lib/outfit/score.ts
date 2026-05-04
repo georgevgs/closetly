@@ -1,5 +1,6 @@
 import type { HSL } from "../color/hsl";
-import { paletteHarmony } from "../color/harmony";
+import { paletteHarmony, pairHarmony, type PairScore } from "../color/harmony";
+import { STYLE_ADJACENCY } from "../../types/items";
 import type { Item, Style } from "../../types/items";
 
 export type ScoreBreakdown = {
@@ -9,6 +10,7 @@ export type ScoreBreakdown = {
   style: number;
   pattern: number;
   weather: number;
+  balance: number;
   notes: string[];
 };
 
@@ -17,18 +19,28 @@ export type WeatherContext = {
   precip: boolean;
 };
 
-const W_COLOR = 0.4;
+const W_COLOR = 0.3;
 const W_FORMALITY = 0.2;
 const W_STYLE = 0.2;
 const W_PATTERN = 0.1;
 const W_WEATHER = 0.1;
+const W_BALANCE = 0.1;
 
 export function scoreOutfit(
   items: Item[],
   opts: { weather?: WeatherContext; pairAffinity?: Map<string, number> } = {}
 ): ScoreBreakdown {
   if (items.length === 0) {
-    return { total: 0, color: 0, formality: 0, style: 0, pattern: 0, weather: 0, notes: [] };
+    return {
+      total: 0,
+      color: 0,
+      formality: 0,
+      style: 0,
+      pattern: 0,
+      weather: 0,
+      balance: 0,
+      notes: [],
+    };
   }
   const notes: string[] = [];
 
@@ -37,31 +49,34 @@ export function scoreOutfit(
   const styleScore = scoreStyle(items, notes);
   const patternScore = scorePattern(items, notes);
   const weatherScore = opts.weather ? scoreWeather(items, opts.weather, notes) : 75;
+  const balanceScore = scoreBalance(items, notes);
 
   let total =
     colorScore * W_COLOR +
     formalityScore * W_FORMALITY +
     styleScore * W_STYLE +
     patternScore * W_PATTERN +
-    weatherScore * W_WEATHER;
+    weatherScore * W_WEATHER +
+    balanceScore * W_BALANCE;
 
-  if (opts.pairAffinity && opts.pairAffinity.size > 0) {
+  if (opts.pairAffinity && opts.pairAffinity.size > 0 && items.length >= 2) {
     let bonus = 0;
-    let pairs = 0;
+    let known = 0;
+    const totalPairs = (items.length * (items.length - 1)) / 2;
     for (let i = 0; i < items.length; i++) {
       for (let j = i + 1; j < items.length; j++) {
         const k = pairKey(items[i].id, items[j].id);
         const aff = opts.pairAffinity.get(k);
         if (aff !== undefined) {
           bonus += aff;
-          pairs++;
+          known++;
         }
       }
     }
-    if (pairs > 0) {
-      const avg = bonus / pairs;
+    if (known > 0) {
+      const avg = bonus / totalPairs;
       total += avg * 5;
-      if (avg > 0.5) notes.push("Boosted by your favorites");
+      if (avg > 0.3) notes.push("Boosted by your favorites");
     }
   }
 
@@ -72,14 +87,31 @@ export function scoreOutfit(
     style: Math.round(styleScore),
     pattern: Math.round(patternScore),
     weather: Math.round(weatherScore),
+    balance: Math.round(balanceScore),
     notes,
   };
 }
 
 function scoreColor(items: Item[], notes: string[]): number {
-  const palette: HSL[] = items.flatMap((i) => i.colors.slice(0, 2).map((c) => c.hsl));
-  if (palette.length < 2) return 60;
-  const result = paletteHarmony(palette);
+  const colorsByItem: HSL[][] = items.map((i) =>
+    i.colors.slice(0, 2).map((c) => c.hsl),
+  );
+  const flatColors = colorsByItem.flat();
+  if (flatColors.length < 2) return 60;
+
+  const crossItemPairs: PairScore[] = [];
+  for (let i = 0; i < colorsByItem.length; i++) {
+    for (let j = i + 1; j < colorsByItem.length; j++) {
+      for (const ca of colorsByItem[i]) {
+        for (const cb of colorsByItem[j]) {
+          crossItemPairs.push(pairHarmony(ca, cb));
+        }
+      }
+    }
+  }
+  if (crossItemPairs.length === 0) return 60;
+
+  const result = paletteHarmony(flatColors, crossItemPairs);
   notes.push(...result.notes);
   return result.score;
 }
@@ -105,14 +137,28 @@ function scoreStyle(items: Item[], notes: string[]): number {
     for (const s of item.styles) tally.set(s, (tally.get(s) ?? 0) + 1);
   }
   if (tally.size === 0) return 70;
-  const entries = [...tally.entries()].sort((a, b) => b[1] - a[1]);
-  const dominant = entries[0];
-  const overlap = dominant[1] / items.length;
-  if (overlap >= 0.75) {
-    notes.push(`Coherent ${dominant[0]} aesthetic`);
-    return 95;
+
+  const dominant = [...tally.entries()].sort((a, b) => b[1] - a[1])[0][0];
+  const compatible = new Set<Style>([dominant, ...STYLE_ADJACENCY[dominant]]);
+
+  let direct = 0;
+  let adjacent = 0;
+  for (const item of items) {
+    if (item.styles.includes(dominant)) direct++;
+    else if (item.styles.some((s) => compatible.has(s))) adjacent++;
   }
-  if (overlap >= 0.5) return 78;
+  const directRatio = direct / items.length;
+  const compatibleRatio = (direct + adjacent) / items.length;
+
+  if (compatibleRatio >= 0.75) {
+    if (directRatio >= 0.75) {
+      notes.push(`Coherent ${dominant} aesthetic`);
+      return 95;
+    }
+    notes.push(`Compatible ${dominant} aesthetic`);
+    return 82;
+  }
+  if (compatibleRatio >= 0.5) return 70;
   return 55;
 }
 
@@ -128,8 +174,18 @@ function scorePattern(items: Item[], notes: string[]): number {
   return 30;
 }
 
+const WARMING_CATEGORIES = new Set<Item["category"]>([
+  "top",
+  "bottom",
+  "dress",
+  "outerwear",
+]);
+
 function scoreWeather(items: Item[], w: WeatherContext, notes: string[]): number {
-  const totalWarmth = items.reduce((s, i) => s + i.warmth, 0);
+  const totalWarmth = items.reduce(
+    (s, i) => (WARMING_CATEGORIES.has(i.category) ? s + i.warmth : s),
+    0,
+  );
   const target = warmthForTemp(w.tempC);
   const diff = Math.abs(totalWarmth - target);
   let score = 100 - diff * 18;
@@ -141,6 +197,50 @@ function scoreWeather(items: Item[], w: WeatherContext, notes: string[]): number
     }
   }
   return Math.max(20, Math.min(100, score));
+}
+
+function scoreBalance(items: Item[], notes: string[]): number {
+  const top = items.find((i) => i.category === "top");
+  const bottom = items.find((i) => i.category === "bottom");
+  const dress = items.find((i) => i.category === "dress");
+
+  if (dress && !top && !bottom) return 75;
+  if (!top || !bottom) return 75;
+
+  const topVol = volumeOf(top);
+  const botVol = volumeOf(bottom);
+  if (topVol == null || botVol == null) return 75;
+
+  const diff = Math.abs(topVol - botVol);
+  if (diff === 0) {
+    if (topVol >= 4) {
+      notes.push("Both pieces oversized — silhouette feels shapeless");
+      return 55;
+    }
+    if (topVol === 3) {
+      notes.push("Both pieces relaxed — risk of looking sloppy");
+      return 72;
+    }
+    return 82;
+  }
+  if (diff === 1) return 88;
+  if (diff === 2) {
+    notes.push("Balanced silhouette — fitted with relaxed");
+    return 95;
+  }
+  return 90;
+}
+
+const FIT_VOLUME: Record<NonNullable<Item["silhouette"]>["fit"], number> = {
+  slim: 1,
+  regular: 2,
+  relaxed: 3,
+  oversized: 4,
+};
+
+function volumeOf(item: Item): number | null {
+  const fit = item.silhouette?.fit;
+  return fit ? FIT_VOLUME[fit] : null;
 }
 
 function warmthForTemp(t: number): number {

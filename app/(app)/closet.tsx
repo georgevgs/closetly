@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { View, Pressable, ScrollView, ActivityIndicator } from "react-native";
 import { useColorScheme } from "nativewind";
 import { FlashList } from "@shopify/flash-list";
@@ -13,6 +13,7 @@ import { GlassSurface } from "~/components/ui/GlassSurface";
 import { ItemCard } from "~/features/closet/components/ItemCard";
 import { useSignedItems } from "~/features/closet/hooks/useSignedItems";
 import { useAuth } from "~/features/auth/context";
+import { useCategoryPrefs } from "~/providers/CategoryPrefsProvider";
 import { CATEGORIES, type Category } from "~/types/items";
 
 const CATEGORY_LABELS: Record<Category, string> = {
@@ -37,8 +38,13 @@ const SORT_LABEL: Record<SortMode, string> = {
 export default function ClosetScreen() {
   const { session } = useAuth();
   const { data: items, isLoading } = useSignedItems(session?.user.id);
+  const { visible: visibleCategories } = useCategoryPrefs();
   const [filter, setFilter] = useState<Category | "all">("all");
   const [sort, setSort] = useState<SortMode>("newest");
+
+  useEffect(() => {
+    if (filter !== "all" && !visibleCategories.includes(filter)) setFilter("all");
+  }, [filter, visibleCategories]);
   const { colorScheme } = useColorScheme();
   const fg = colorScheme === "dark" ? "#f5f3ef" : "#1a1a1a";
 
@@ -113,7 +119,7 @@ export default function ClosetScreen() {
           contentContainerStyle={{ paddingHorizontal: 24, paddingVertical: 8, gap: 8 }}
         >
           <Pill label="All" selected={filter === "all"} onPress={() => setFilter("all")} />
-          {CATEGORIES.map((c) => (
+          {visibleCategories.map((c) => (
             <Pill
               key={c}
               label={CATEGORY_LABELS[c]}

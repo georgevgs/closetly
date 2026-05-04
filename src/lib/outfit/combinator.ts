@@ -102,7 +102,6 @@ function quickPairScore(item: Item, anchor: Item, w?: WeatherContext): number {
 }
 
 function buildCombos(buckets: Item[][], idx: number, acc: Item[], out: Item[][]) {
-  if (out.length >= 200) return;
   if (idx === buckets.length) {
     out.push([...acc]);
     return;

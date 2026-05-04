@@ -42,6 +42,7 @@ export type Database = {
           thumb_path: string | null
           updated_at: string
           user_id: string
+          vision_attrs: Json
           warmth: number
         }
         Insert: {
@@ -61,6 +62,7 @@ export type Database = {
           thumb_path?: string | null
           updated_at?: string
           user_id: string
+          vision_attrs?: Json
           warmth?: number
         }
         Update: Partial<Database["public"]["Tables"]["items"]["Insert"]>

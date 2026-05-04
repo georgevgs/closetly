@@ -55,7 +55,12 @@ export function hueDistance(a: number, b: number): number {
 }
 
 export function isNeutral({ s, l }: HSL): boolean {
-  return s < 0.12 || l < 0.08 || l > 0.94;
+  if (s < 0.12) return true;
+  if (l < 0.08) return true;
+  if (l > 0.94) return true;
+  if (l <= 0.28 && s <= 0.6) return true;
+  if (l >= 0.82 && s <= 0.25) return true;
+  return false;
 }
 
 export function isDark({ l }: HSL): boolean {

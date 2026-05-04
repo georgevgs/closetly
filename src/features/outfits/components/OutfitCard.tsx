@@ -69,6 +69,7 @@ export function OutfitCard({
         <ScoreChip label="Color" value={outfit.score.color} />
         <ScoreChip label="Style" value={outfit.score.style} />
         <ScoreChip label="Formality" value={outfit.score.formality} />
+        <ScoreChip label="Balance" value={outfit.score.balance} />
         <ScoreChip label="Pattern" value={outfit.score.pattern} />
       </View>
 

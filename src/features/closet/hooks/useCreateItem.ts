@@ -3,12 +3,13 @@ import * as Crypto from "expo-crypto";
 import { supabase } from "~/lib/supabase";
 import { uploadItemImage } from "../upload";
 import { itemsKeys } from "./useItems";
-import type { TablesInsert } from "~/types/database";
-import type { ItemColor } from "~/types/items";
+import type { Json, TablesInsert } from "~/types/database";
+import type { ItemColor, VisionAttrs } from "~/types/items";
 
 export type NewItemInput = Omit<TablesInsert<"items">, "user_id" | "photo_path" | "thumb_path"> & {
   photoUri: string;
   colors: ItemColor[];
+  visionAttrs?: VisionAttrs | null;
 };
 
 export function useCreateItem() {
@@ -26,7 +27,7 @@ export function useCreateItem() {
         itemId
       );
 
-      const { photoUri: _photoUri, ...rest } = input;
+      const { photoUri: _photoUri, visionAttrs, ...rest } = input;
       const { data, error } = await supabase
         .from("items")
         .insert({
@@ -36,6 +37,7 @@ export function useCreateItem() {
           photo_path: photoPath,
           thumb_path: thumbPath,
           colors: rest.colors as unknown as TablesInsert<"items">["colors"],
+          vision_attrs: (visionAttrs ?? {}) as unknown as Json,
         })
         .select()
         .single();

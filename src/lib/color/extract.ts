@@ -29,3 +29,44 @@ export function buildPalette(picks: Swatch[]): ExtractedPalette | null {
     tertiary: picks[2],
   };
 }
+
+export function nearestPresetSwatch(hex: string): Swatch {
+  const target = hexToRgb(hex);
+  let best = PRESET_PALETTE[0];
+  let bestDist = Infinity;
+  for (const swatch of PRESET_PALETTE) {
+    const rgb = hexToRgb(swatch.hex);
+    const d =
+      (target[0] - rgb[0]) ** 2 +
+      (target[1] - rgb[1]) ** 2 +
+      (target[2] - rgb[2]) ** 2;
+    if (d < bestDist) {
+      bestDist = d;
+      best = swatch;
+    }
+  }
+  return best;
+}
+
+export function snapHexesToPresets(hexes: string[]): Swatch[] {
+  const out: Swatch[] = [];
+  const seen = new Set<string>();
+  for (const hex of hexes) {
+    if (!/^#[0-9a-fA-F]{6}$/.test(hex)) continue;
+    const swatch = nearestPresetSwatch(hex);
+    if (seen.has(swatch.hex)) continue;
+    seen.add(swatch.hex);
+    out.push(swatch);
+    if (out.length >= 3) break;
+  }
+  return out;
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+  const c = hex.replace("#", "");
+  return [
+    parseInt(c.slice(0, 2), 16),
+    parseInt(c.slice(2, 4), 16),
+    parseInt(c.slice(4, 6), 16),
+  ];
+}

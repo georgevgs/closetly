@@ -13,6 +13,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { QueryProvider } from "~/providers/QueryProvider";
 import { ThemeProvider } from "~/providers/ThemeProvider";
+import { CategoryPrefsProvider } from "~/providers/CategoryPrefsProvider";
 import { AuthProvider, useAuth } from "~/features/auth/context";
 
 export const unstable_settings = {
@@ -44,7 +45,11 @@ function AuthGate() {
       />
       <Stack.Screen
         name="items/[id]"
-        options={{ headerShown: true, headerBackTitle: "Closet" }}
+        options={{ headerShown: true, headerBackTitle: "Closet", title: "Item" }}
+      />
+      <Stack.Screen
+        name="items/edit/[id]"
+        options={{ presentation: "modal", headerShown: true, title: "Edit item" }}
       />
       <Stack.Screen
         name="outfits/suggest"
@@ -60,15 +65,17 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <ThemeProvider>
-          <QueryProvider>
-            <AuthProvider>
-              <BottomSheetModalProvider>
-                <AuthGate />
-                <Toaster theme={colorScheme === "dark" ? "dark" : "light"} position="top-center" />
-                <StatusBar style="auto" />
-              </BottomSheetModalProvider>
-            </AuthProvider>
-          </QueryProvider>
+          <CategoryPrefsProvider>
+            <QueryProvider>
+              <AuthProvider>
+                <BottomSheetModalProvider>
+                  <AuthGate />
+                  <Toaster theme={colorScheme === "dark" ? "dark" : "light"} position="top-center" />
+                  <StatusBar style="auto" />
+                </BottomSheetModalProvider>
+              </AuthProvider>
+            </QueryProvider>
+          </CategoryPrefsProvider>
         </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

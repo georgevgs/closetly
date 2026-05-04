@@ -1,5 +1,5 @@
 import type { Tables } from "~/types/database";
-import type { Item, ItemColor, Formality, Warmth } from "~/types/items";
+import type { Item, ItemColor, Formality, Silhouette, Warmth } from "~/types/items";
 import { supabase } from "~/lib/supabase";
 
 export type ItemRow = Tables<"items">;
@@ -7,6 +7,7 @@ export type ItemRow = Tables<"items">;
 const SIGNED_URL_TTL = 60 * 60; // 1h
 
 export function itemFromRow(row: ItemRow): Item {
+  const visionAttrs = (row.vision_attrs ?? {}) as { silhouette?: Silhouette };
   return {
     id: row.id,
     user_id: row.user_id,
@@ -20,6 +21,7 @@ export function itemFromRow(row: ItemRow): Item {
     pattern: row.pattern,
     seasons: row.seasons,
     styles: row.styles,
+    silhouette: visionAttrs.silhouette ?? null,
     brand: row.brand,
     notes: row.notes,
     created_at: row.created_at,

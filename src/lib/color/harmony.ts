@@ -44,20 +44,33 @@ export function pairHarmony(a: HSL, b: HSL): PairScore {
   return { score: clashPenalty, type: "clash" };
 }
 
-export function paletteHarmony(colors: HSL[]): {
+export function paletteHarmony(
+  colors: HSL[],
+  externalPairs?: PairScore[],
+): {
   score: number;
   pairs: PairScore[];
   notes: string[];
 } {
-  if (colors.length < 2) return { score: 50, pairs: [], notes: [] };
+  if (colors.length < 2 && (!externalPairs || externalPairs.length === 0)) {
+    return { score: 50, pairs: [], notes: [] };
+  }
 
-  const pairs: PairScore[] = [];
-  for (let i = 0; i < colors.length; i++) {
-    for (let j = i + 1; j < colors.length; j++) {
-      pairs.push(pairHarmony(colors[i], colors[j]));
+  let pairs: PairScore[];
+  if (externalPairs) {
+    pairs = externalPairs;
+  } else {
+    pairs = [];
+    for (let i = 0; i < colors.length; i++) {
+      for (let j = i + 1; j < colors.length; j++) {
+        pairs.push(pairHarmony(colors[i], colors[j]));
+      }
     }
   }
-  const avg = pairs.reduce((s, p) => s + p.score, 0) / pairs.length;
+  const avg =
+    pairs.length > 0
+      ? pairs.reduce((s, p) => s + p.score, 0) / pairs.length
+      : 60;
 
   const notes: string[] = [];
   let score = avg;
