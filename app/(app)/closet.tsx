@@ -9,6 +9,7 @@ import * as Haptics from "expo-haptics";
 import { Screen } from "~/components/ui/Screen";
 import { Text } from "~/components/ui/Text";
 import { Pill } from "~/components/ui/Pill";
+import { GlassSurface } from "~/components/ui/GlassSurface";
 import { ItemCard } from "~/features/closet/components/ItemCard";
 import { useSignedItems } from "~/features/closet/hooks/useSignedItems";
 import { useAuth } from "~/features/auth/context";
@@ -40,7 +41,6 @@ export default function ClosetScreen() {
   const [sort, setSort] = useState<SortMode>("newest");
   const { colorScheme } = useColorScheme();
   const fg = colorScheme === "dark" ? "#f5f3ef" : "#1a1a1a";
-  const onInk = colorScheme === "dark" ? "#0e0e0d" : "#faf8f5";
 
   const sorted = useMemo(() => {
     if (!items) return [];
@@ -86,9 +86,21 @@ export default function ClosetScreen() {
               router.push("/items/new");
             }}
             hitSlop={12}
-            className="h-11 w-11 rounded-full bg-ink dark:bg-ink-dark items-center justify-center"
           >
-            <SymbolView name="plus" size={20} tintColor={onInk} />
+            <GlassSurface
+              isInteractive
+              style={{
+                height: 44,
+                width: 44,
+                borderRadius: 22,
+                alignItems: "center",
+                justifyContent: "center",
+                overflow: "hidden",
+              }}
+              fallbackClassName="bg-canvas/70 dark:bg-canvas-dark/70 border border-line/60 dark:border-line-dark/60"
+            >
+              <SymbolView name="plus" size={20} tintColor={fg} weight="semibold" />
+            </GlassSurface>
           </Pressable>
         </View>
       </View>
