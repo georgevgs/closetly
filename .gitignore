@@ -1,15 +1,23 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+# https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
-# dependencies
+# Dependencies
 node_modules/
 
 # Expo
 .expo/
+.expo-shared/
 dist/
 web-build/
 expo-env.d.ts
 
-# Native
+# Generated native folders (managed by `expo prebuild`)
+/ios
+/android
+
+# Metro
+.metro-health-check*
+
+# Native build / signing artifacts
 .kotlin/
 *.orig.*
 *.jks
@@ -17,27 +25,38 @@ expo-env.d.ts
 *.p12
 *.key
 *.mobileprovision
+*.pem
 
-# Metro
-.metro-health-check*
+# Environment files (keep .env.example)
+.env
+.env.*
+!.env.example
 
-# debug
+# Logs
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+*.log
 
-# macOS
-.DS_Store
-*.pem
-
-# local env files
-.env*.local
-
-# typescript
+# TypeScript
 *.tsbuildinfo
 
-app-example
+# Editors / IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
 
-# generated native folders
-/ios
-/android
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code (local)
+.claude/
+
+# Supabase local dev
+supabase/.branches/
+supabase/.temp/
+
+# Reset-project output (from create-expo-app template)
+app-example/

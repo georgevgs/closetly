@@ -1,50 +1,97 @@
-# Welcome to your Expo app 👋
+# Closetly
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A React Native closet & outfit app built with Expo SDK 55, Supabase, and NativeWind.
 
-## Get started
+## Stack
 
-1. Install dependencies
+- **Expo** SDK 55 with **expo-router** (file-based routing)
+- **React Native** 0.83 / **React** 19.2
+- **Reanimated** 4 + **react-native-worklets**
+- **NativeWind** 4 (Tailwind for RN)
+- **Supabase** for auth, database, and storage
+- **TanStack Query** for server state, **Zustand** for client state
+- **FlashList** v2, **expo-image**, **expo-glass-effect**, **expo-symbols**, **@gorhom/bottom-sheet**
+- **bun** as the package manager
+
+> The app uses native modules that **are not available in Expo Go**. You must run a development build (`expo run:ios` / `expo run:android`).
+
+## Prerequisites
+
+- [Bun](https://bun.sh)
+- Xcode (for iOS) and/or Android Studio (for Android)
+- CocoaPods (`sudo gem install cocoapods`) — needed for iOS
+- A Supabase project ([create one](https://supabase.com))
+
+## Setup
+
+1. **Install dependencies**
 
    ```bash
-   npm install
+   bun install
    ```
 
-2. Start the app
+2. **Configure environment**
 
    ```bash
-   npx expo start
+   cp .env.example .env
    ```
 
-In the output, you'll find options to open the app in a
+   Fill in:
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+   ```
+   EXPO_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+   EXPO_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
+   ```
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+3. **Apply Supabase migrations**
 
-## Get a fresh project
+   With the [Supabase CLI](https://supabase.com/docs/guides/local-development) linked to your project:
 
-When you're ready, run:
+   ```bash
+   supabase db push
+   ```
+
+   Migrations live in `supabase/migrations/`.
+
+4. **Install iOS pods** (first run only, or after native deps change)
+
+   ```bash
+   cd ios && pod install && cd -
+   ```
+
+   If you need to regenerate native projects from scratch: `bun expo prebuild --clean`.
+
+## Run
 
 ```bash
-npm run reset-project
+bun run ios       # build & launch the iOS dev client
+bun run android   # build & launch the Android dev client
+bun start         # start the Metro bundler (for an already-installed dev build)
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Project layout
 
-## Learn more
+```
+app/             expo-router routes
+  (auth)/        sign-in / sign-up
+  (app)/         main tabs (closet, trips, profile, …)
+  items/         item detail & creation
+  outfits/       outfit detail & creation
+src/
+  components/   shared UI (Screen, Text, Pill, GlassSurface, …)
+  features/     feature modules (auth, closet, outfits, trips, weather)
+  hooks/        shared hooks
+  lib/          utilities (color, supabase client, …)
+  providers/    React context providers
+  store/        Zustand stores
+  types/        shared TS types
+supabase/
+  migrations/   SQL migrations
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+## Scripts
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- `bun run ios` / `bun run android` — build & run native dev client
+- `bun start` — start Metro
+- `bun run web` — run on web (limited; native modules won't work)
+- `bun run lint` — run `expo lint`
