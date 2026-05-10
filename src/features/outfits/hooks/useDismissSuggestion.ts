@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Item } from "~/types/items";
+import { handleError } from "~/lib/handleError";
 import { requireUserId } from "~/features/auth/requireUserId";
 import { bumpPairAffinity } from "../affinity";
 import { PAIR_AFFINITY } from "../tuning";
@@ -22,5 +23,7 @@ export function useDismissSuggestion() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pair-affinity"] });
     },
+    onError: (error) =>
+      handleError(error, { fallbackMessage: "Couldn't dismiss that suggestion." }),
   });
 }

@@ -1,8 +1,23 @@
-import { QueryClient, QueryClientProvider, focusManager } from "@tanstack/react-query";
+import {
+  MutationCache,
+  QueryClient,
+  QueryClientProvider,
+  focusManager,
+} from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { AppState, type AppStateStatus, Platform } from "react-native";
 
+import { handleError } from "~/lib/handleError";
+
+const mutationCache = new MutationCache({
+  onError: (error, _variables, _context, mutation) => {
+    if (mutation.options.onError) return;
+    handleError(error, { fallbackMessage: "Couldn't save your changes." });
+  },
+});
+
 const queryClient = new QueryClient({
+  mutationCache,
   defaultOptions: {
     queries: {
       retry: 1,

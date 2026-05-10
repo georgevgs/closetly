@@ -10,8 +10,8 @@ export type OutfitActions = {
   savedKeys: Set<string>;
   wornKeys: Set<string>;
   dismissedKeys: Set<string>;
-  handleSave: (suggestion: OutfitSuggestion, key: string) => Promise<void>;
-  handleWear: (suggestion: OutfitSuggestion, key: string) => Promise<void>;
+  handleSave: (suggestion: OutfitSuggestion, key: string) => void;
+  handleWear: (suggestion: OutfitSuggestion, key: string) => void;
   handleDismiss: (suggestion: OutfitSuggestion, key: string) => void;
 };
 
@@ -25,18 +25,30 @@ export function useOutfitActions(
   const [wornKeys, setWornKeys] = useState<Set<string>>(new Set());
   const [dismissedKeys, setDismissedKeys] = useState<Set<string>>(new Set());
 
-  const handleSave = async (suggestion: OutfitSuggestion, key: string) => {
+  const handleSave = (suggestion: OutfitSuggestion, key: string) => {
     if (savedKeys.has(key)) return;
-    await save.mutateAsync({ items: suggestion.items, favorite: true, rating: 5 });
-    setSavedKeys((previous) => addTo(previous, key));
-    toast.success("Saved to favorites");
+    save.mutate(
+      { items: suggestion.items, favorite: true, rating: 5 },
+      {
+        onSuccess: () => {
+          setSavedKeys((previous) => addTo(previous, key));
+          toast.success("Saved to favorites");
+        },
+      },
+    );
   };
 
-  const handleWear = async (suggestion: OutfitSuggestion, key: string) => {
+  const handleWear = (suggestion: OutfitSuggestion, key: string) => {
     if (wornKeys.has(key)) return;
-    await wear.mutateAsync({ items: suggestion.items, weather });
-    setWornKeys((previous) => addTo(previous, key));
-    toast.success("Logged for today");
+    wear.mutate(
+      { items: suggestion.items, weather },
+      {
+        onSuccess: () => {
+          setWornKeys((previous) => addTo(previous, key));
+          toast.success("Logged for today");
+        },
+      },
+    );
   };
 
   const handleDismiss = (suggestion: OutfitSuggestion, key: string) => {

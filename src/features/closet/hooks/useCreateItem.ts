@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import * as Crypto from "expo-crypto";
 import { supabase } from "~/lib/supabase";
+import { handleError } from "~/lib/handleError";
 import { uploadItemImage } from "../upload";
 import { itemsKeys } from "./useItems";
 import type { Json, TablesInsert } from "~/types/database";
@@ -45,5 +46,7 @@ export function useCreateItem() {
       return data;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: itemsKeys.all }),
+    onError: (error) =>
+      handleError(error, { fallbackMessage: "Couldn't add this item. Please try again." }),
   });
 }

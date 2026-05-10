@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "~/lib/supabase";
+import { handleError } from "~/lib/handleError";
 import { requireUserId } from "~/features/auth/requireUserId";
 import { bumpPairAffinity } from "~/features/outfits/affinity";
 
@@ -32,6 +33,8 @@ export function useUndoWear() {
       queryClient.invalidateQueries({ queryKey: ["pair-affinity"] });
       queryClient.invalidateQueries({ queryKey: ["outfits"] });
     },
+    onError: (error) =>
+      handleError(error, { fallbackMessage: "Couldn't undo that wear." }),
   });
 }
 

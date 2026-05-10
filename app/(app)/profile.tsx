@@ -8,8 +8,10 @@ import { supabase } from "~/lib/supabase";
 import { useThemePreference, type ThemePreference } from "~/providers/ThemeProvider";
 import { useCategoryPrefs } from "~/providers/CategoryPrefsProvider";
 import { WearHistorySection } from "~/features/wear/components/WearHistorySection";
+import { LegalLinks } from "~/features/legal/components/LegalLinks";
 import { CATEGORIES } from "~/types/items";
 import { cn } from "~/lib/utils";
+import { handleError } from "~/lib/handleError";
 
 const CATEGORY_LABELS: Record<(typeof CATEGORIES)[number], string> = {
   top: "Tops",
@@ -32,6 +34,11 @@ export default function ProfileScreen() {
   const { session } = useAuth();
   const { preference, setPreference } = useThemePreference();
   const { isHidden, toggle } = useCategoryPrefs();
+
+  const signOut = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) handleError(error, { fallbackMessage: "Couldn't sign out." });
+  };
 
   return (
     <Screen>
@@ -95,13 +102,11 @@ export default function ProfileScreen() {
           </View>
 
           <WearHistorySection userId={session?.user.id} />
+
+          <LegalLinks />
         </View>
         <View className="mt-auto pt-12">
-          <Button
-            label="Sign out"
-            variant="secondary"
-            onPress={() => supabase.auth.signOut()}
-          />
+          <Button label="Sign out" variant="secondary" onPress={signOut} />
         </View>
       </ScrollView>
     </Screen>

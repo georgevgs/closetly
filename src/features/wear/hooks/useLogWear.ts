@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "~/lib/supabase";
+import { handleError } from "~/lib/handleError";
 import { toDateString } from "~/lib/dates";
 import type { Item } from "~/types/items";
 import type { WeatherSnapshot } from "~/features/weather/useWeather";
@@ -42,6 +43,8 @@ export function useLogWear() {
       queryClient.invalidateQueries({ queryKey: ["wear-log"] });
       queryClient.invalidateQueries({ queryKey: ["recent-wears"] });
     },
+    onError: (error) =>
+      handleError(error, { fallbackMessage: "Couldn't log this outfit." }),
   });
 }
 

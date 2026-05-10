@@ -4,7 +4,6 @@ import {
   ScrollView,
   Pressable,
   TextInput,
-  Alert,
   ActivityIndicator,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
@@ -12,6 +11,8 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { toast } from "sonner-native";
+
+import { ensureCameraPermission } from "~/lib/permissions";
 
 import { Screen } from "~/components/ui/Screen";
 import { Text } from "~/components/ui/Text";
@@ -120,11 +121,8 @@ export default function NewItemScreen() {
 
   async function pickPhoto(source: "camera" | "library") {
     if (source === "camera") {
-      const perm = await ImagePicker.requestCameraPermissionsAsync();
-      if (!perm.granted) {
-        Alert.alert("Camera permission needed");
-        return;
-      }
+      const granted = await ensureCameraPermission();
+      if (!granted) return;
     }
     const result = await launchPicker(source);
     if (result.canceled) return;
@@ -205,7 +203,7 @@ export default function NewItemScreen() {
     });
   }
 
-  async function save() {
+  function save() {
     if (!photoUri) {
       toast.error("Add a photo first");
       return;
@@ -215,10 +213,10 @@ export default function NewItemScreen() {
       return;
     }
     const colors = [palette.primary, palette.secondary, palette.tertiary].filter(
-      (c): c is NonNullable<typeof c> => Boolean(c)
+      (color): color is NonNullable<typeof color> => Boolean(color)
     );
-    try {
-      await create.mutateAsync({
+    create.mutate(
+      {
         photoUri,
         category,
         name: nameOrNull(name),
@@ -229,13 +227,14 @@ export default function NewItemScreen() {
         warmth,
         colors,
         visionAttrs: visionAttrsRef.current,
-      });
-      toast.success("Added to closet");
-      router.back();
-    } catch (e) {
-      const err = e as Error;
-      Alert.alert("Could not save", err.message);
-    }
+      },
+      {
+        onSuccess: () => {
+          toast.success("Added to closet");
+          router.back();
+        },
+      },
+    );
   }
 
   function toggle<T>(set: Set<T>, value: T, setter: (s: Set<T>) => void) {

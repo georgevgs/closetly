@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "~/lib/supabase";
+import { handleError } from "~/lib/handleError";
 import { orNull } from "~/lib/utils";
 import type { Item } from "~/types/items";
 import { requireUserId } from "~/features/auth/requireUserId";
@@ -39,6 +40,8 @@ export function useSaveOutfit() {
       queryClient.invalidateQueries({ queryKey: ["favorites"] });
       queryClient.invalidateQueries({ queryKey: ["pair-affinity"] });
     },
+    onError: (error) =>
+      handleError(error, { fallbackMessage: "Couldn't save this outfit." }),
   });
 }
 

@@ -12,6 +12,7 @@ import { useAuth } from "~/features/auth/context";
 import { usePairAffinity } from "~/features/outfits/hooks/usePairAffinity";
 import { useRecentWears } from "~/features/wear/hooks/useRecentWears";
 import { TodayOutfitsSection } from "~/features/outfits/components/TodayOutfitsSection";
+import { LocationPrompt } from "~/features/weather/components/LocationPrompt";
 import type { Item, Category } from "~/types/items";
 
 const ANCHOR_PRIORITY: Category[] = ["bottom", "outerwear", "dress", "top", "shoes"];
@@ -33,6 +34,7 @@ export default function TodayScreen() {
     <Screen>
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
         <Greeting weather={weather} />
+        <LocationPrompt />
         <HomeBody
           isLoading={isLoading}
           anchorCandidates={anchorCandidates}

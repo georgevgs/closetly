@@ -144,10 +144,8 @@ export default function ItemDetail() {
               {
                 text: "Remove",
                 style: "destructive",
-                onPress: async () => {
-                  await del.mutateAsync(display.id);
-                  router.back();
-                },
+                onPress: () =>
+                  del.mutate(display.id, { onSuccess: () => router.back() }),
               },
             ])
           }

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "~/lib/supabase";
+import { handleError } from "~/lib/handleError";
 import type {
   Item,
   Category,
@@ -61,6 +62,8 @@ export function useDeleteItem() {
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: itemsKeys.all }),
+    onError: (error) =>
+      handleError(error, { fallbackMessage: "Couldn't remove this item." }),
   });
 }
 
@@ -93,6 +96,8 @@ export function useUpdateItem() {
       qc.invalidateQueries({ queryKey: itemsKeys.all });
       qc.invalidateQueries({ queryKey: itemsKeys.one(vars.id) });
     },
+    onError: (error) =>
+      handleError(error, { fallbackMessage: "Couldn't save your changes." }),
   });
 }
 
@@ -159,5 +164,7 @@ export function useReplaceItemPhoto() {
       qc.invalidateQueries({ queryKey: itemsKeys.one(vars.id) });
       qc.invalidateQueries({ queryKey: ["item-signed", vars.id] });
     },
+    onError: (error) =>
+      handleError(error, { fallbackMessage: "Couldn't replace the photo." }),
   });
 }

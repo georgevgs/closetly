@@ -30,40 +30,39 @@ const WEATHER_CODES: Record<number, string> = {
   95: "Thunderstorm",
 };
 
+export const weatherKeys = {
+  current: ["weather", "current"] as const,
+};
+
 export function useWeather() {
   return useQuery({
-    queryKey: ["weather", "current"],
+    queryKey: weatherKeys.current,
     staleTime: 30 * 60 * 1000,
     queryFn: async (): Promise<WeatherSnapshot | null> => {
       const perm = await Location.getForegroundPermissionsAsync();
-      let granted = perm.granted;
-      if (!granted && perm.canAskAgain) {
-        const req = await Location.requestForegroundPermissionsAsync();
-        granted = req.granted;
-      }
-      if (!granted) return null;
+      if (!perm.granted) return null;
 
-      const loc = await Location.getLastKnownPositionAsync({});
+      const lastKnown = await Location.getLastKnownPositionAsync({});
       const coords =
-        loc?.coords ?? (await Location.getCurrentPositionAsync({})).coords;
+        lastKnown?.coords ?? (await Location.getCurrentPositionAsync({})).coords;
 
       const url = new URL("https://api.open-meteo.com/v1/forecast");
       url.searchParams.set("latitude", String(coords.latitude));
       url.searchParams.set("longitude", String(coords.longitude));
       url.searchParams.set(
         "current",
-        "temperature_2m,precipitation_probability,weather_code"
+        "temperature_2m,precipitation_probability,weather_code",
       );
       url.searchParams.set("timezone", "auto");
 
-      const res = await fetch(url.toString());
-      if (!res.ok) throw new Error("Weather fetch failed");
-      const data = await res.json();
-      const c = data.current;
-      const code = c.weather_code as number;
+      const response = await fetch(url.toString());
+      if (!response.ok) throw new Error("Weather fetch failed");
+      const data = await response.json();
+      const current = data.current;
+      const code = current.weather_code as number;
       return {
-        tempC: c.temperature_2m,
-        precipProb: (c.precipitation_probability ?? 0) / 100,
+        tempC: current.temperature_2m,
+        precipProb: (current.precipitation_probability ?? 0) / 100,
         weatherCode: code,
         summary: WEATHER_CODES[code] ?? "—",
       };

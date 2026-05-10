@@ -5,6 +5,7 @@ import { toast } from "sonner-native";
 import { Screen } from "~/components/ui/Screen";
 import { Text } from "~/components/ui/Text";
 import { Button } from "~/components/ui/Button";
+import { ConsentLine } from "~/features/legal/components/ConsentLine";
 import { supabase } from "~/lib/supabase";
 
 type Mode = "email" | "code";
@@ -106,9 +107,7 @@ export default function SignIn() {
           )}
         </View>
 
-        <Text variant="caption" className="text-center">
-          By continuing you agree to our terms
-        </Text>
+        <ConsentLine />
       </KeyboardAvoidingView>
     </Screen>
   );

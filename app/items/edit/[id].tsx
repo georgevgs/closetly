@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { View, ScrollView, TextInput, ActivityIndicator, Alert, Pressable } from "react-native";
+import { View, ScrollView, TextInput, ActivityIndicator, Pressable } from "react-native";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, router } from "expo-router";
@@ -13,6 +13,7 @@ import { Pill } from "~/components/ui/Pill";
 import { useItem, useUpdateItem, useReplaceItemPhoto } from "~/features/closet/hooks/useItems";
 import { signItemUrls } from "~/features/closet/mapper";
 import { seasonsForWarmth } from "~/lib/seasons";
+import { ensureCameraPermission } from "~/lib/permissions";
 import { isBgRemovalAvailable, removeBackground } from "expo-bg-remover";
 import { useCategoryPrefs } from "~/providers/CategoryPrefsProvider";
 import {
@@ -86,11 +87,8 @@ export default function EditItemScreen() {
   async function pickReplacement(source: "camera" | "library") {
     if (!item) return;
     if (source === "camera") {
-      const perm = await ImagePicker.requestCameraPermissionsAsync();
-      if (!perm.granted) {
-        Alert.alert("Camera permission needed");
-        return;
-      }
+      const granted = await ensureCameraPermission();
+      if (!granted) return;
     }
     const result =
       source === "camera"
@@ -117,23 +115,22 @@ export default function EditItemScreen() {
         // No subject detected — fall back to original.
       }
     }
-    try {
-      await replacePhoto.mutateAsync({
+    replacePhoto.mutate(
+      {
         id: item.id,
         photoUri,
         analysisUri: original,
-      });
-      toast.success("Photo replaced — colors updated");
-    } catch (e) {
-      const err = e as Error;
-      Alert.alert("Could not replace photo", err.message);
-    }
+      },
+      {
+        onSuccess: () => toast.success("Photo replaced — colors updated"),
+      },
+    );
   }
 
-  async function save() {
+  function save() {
     if (!item) return;
-    try {
-      await update.mutateAsync({
+    update.mutate(
+      {
         id: item.id,
         name: name.trim() || null,
         category,
@@ -143,13 +140,14 @@ export default function EditItemScreen() {
         formality,
         warmth,
         silhouette: silhouetteFromFit(fit, item.silhouette),
-      });
-      toast.success("Saved");
-      router.back();
-    } catch (e) {
-      const err = e as Error;
-      Alert.alert("Could not save", err.message);
-    }
+      },
+      {
+        onSuccess: () => {
+          toast.success("Saved");
+          router.back();
+        },
+      },
+    );
   }
 
   const handleFitTap = (option: Fit) => {

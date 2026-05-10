@@ -27,6 +27,12 @@ expo-env.d.ts
 *.mobileprovision
 *.pem
 
+# EAS / store credentials
+google-service-account.json
+google-services.json
+GoogleService-Info.plist
+credentials.json
+
 # Environment files (keep .env.example)
 .env
 .env.*
