@@ -27,6 +27,17 @@ export type Style = (typeof STYLES)[number];
 export const SEASONS = ["spring", "summer", "autumn", "winter"] as const;
 export type Season = (typeof SEASONS)[number];
 
+export const OCCASIONS = [
+  "work",
+  "casual",
+  "formal",
+  "sport",
+  "date",
+  "travel",
+  "party",
+] as const;
+export type Occasion = (typeof OCCASIONS)[number];
+
 export const PATTERNS = [
   "solid",
   "striped",
@@ -76,6 +87,11 @@ export type Item = {
   silhouette: Silhouette | null;
   brand: string | null;
   notes: string | null;
+  occasions: Occasion[];
+  price: number | null;
+  currency: string | null;
+  purchasedOn: string | null;
+  timesWashed: number;
   created_at: string;
 };
 

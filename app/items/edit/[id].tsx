@@ -20,6 +20,7 @@ import {
   STYLES,
   SEASONS,
   PATTERNS,
+  OCCASIONS,
   type Category,
   type Style,
   type Season,
@@ -27,6 +28,7 @@ import {
   type Formality,
   type Warmth,
   type Silhouette,
+  type Occasion,
 } from "~/types/items";
 
 type Fit = Silhouette["fit"];
@@ -54,11 +56,15 @@ export default function EditItemScreen() {
   const [formality, setFormality] = useState<Formality>(3);
   const [warmth, setWarmth] = useState<Warmth>(2);
   const [fit, setFit] = useState<Fit | null>(null);
+  const [occasions, setOccasions] = useState<Set<Occasion>>(new Set());
+  const [priceText, setPriceText] = useState("");
+  const [currencyText, setCurrencyText] = useState("");
+  const [purchasedOnText, setPurchasedOnText] = useState("");
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     if (!item || hydrated) return;
-    setName(item.name ?? "");
+    setName(initialName(item.name));
     setCategory(item.category);
     setStyles(new Set(item.styles));
     setSeasons(new Set(item.seasons));
@@ -66,6 +72,10 @@ export default function EditItemScreen() {
     setFormality(item.formality);
     setWarmth(item.warmth);
     setFit(initialFit(item.silhouette));
+    setOccasions(new Set(item.occasions));
+    setPriceText(initialPriceText(item.price));
+    setCurrencyText(initialCurrencyText(item.currency));
+    setPurchasedOnText(initialPurchasedOnText(item.purchasedOn));
     setHydrated(true);
   }, [item, hydrated]);
 
@@ -132,13 +142,17 @@ export default function EditItemScreen() {
     update.mutate(
       {
         id: item.id,
-        name: name.trim() || null,
+        name: trimmedNameOrNull(name),
         category,
         styles: [...styles],
         seasons: [...seasons],
         pattern,
         formality,
         warmth,
+        occasions: [...occasions],
+        price: parsePriceInput(priceText),
+        currency: normaliseCurrencyInput(currencyText),
+        purchasedOn: parsePurchasedOnInput(purchasedOnText),
         silhouette: silhouetteFromFit(fit, item.silhouette),
       },
       {
@@ -311,6 +325,52 @@ export default function EditItemScreen() {
           </View>
         </Section>
 
+        <Section title="Occasions" subtitle="Optional — when you'd reach for this piece">
+          <View className="flex-row flex-wrap gap-2">
+            {OCCASIONS.map((occasion) => (
+              <Pill
+                key={occasion}
+                label={occasion}
+                selected={occasions.has(occasion)}
+                onPress={() => toggle(occasions, occasion, setOccasions)}
+              />
+            ))}
+          </View>
+        </Section>
+
+        <Section title="Price" subtitle="Optional — used for cost-per-wear">
+          <View className="flex-row gap-2">
+            <TextInput
+              value={priceText}
+              onChangeText={setPriceText}
+              keyboardType="decimal-pad"
+              placeholder="0.00"
+              placeholderTextColor="#a8a29e"
+              className="flex-1 h-12 px-4 rounded-lg border border-line dark:border-line-dark text-ink dark:text-ink-dark"
+            />
+            <TextInput
+              value={currencyText}
+              onChangeText={setCurrencyText}
+              autoCapitalize="characters"
+              maxLength={3}
+              placeholder="USD"
+              placeholderTextColor="#a8a29e"
+              className="w-24 h-12 px-4 rounded-lg border border-line dark:border-line-dark text-ink dark:text-ink-dark"
+            />
+          </View>
+        </Section>
+
+        <Section title="Purchased on" subtitle="Optional — YYYY-MM-DD">
+          <TextInput
+            value={purchasedOnText}
+            onChangeText={setPurchasedOnText}
+            placeholder="2026-05-10"
+            placeholderTextColor="#a8a29e"
+            keyboardType="numbers-and-punctuation"
+            className="h-12 px-4 rounded-lg border border-line dark:border-line-dark text-ink dark:text-ink-dark"
+          />
+        </Section>
+
         <Button
           label="Save changes"
           onPress={save}
@@ -351,6 +411,55 @@ function Section({
 const initialFit = (silhouette: Silhouette | null): Fit | null => {
   if (!silhouette) return null;
   return silhouette.fit;
+};
+
+const initialName = (name: string | null): string => {
+  if (name === null) return "";
+  return name;
+};
+
+const trimmedNameOrNull = (name: string): string | null => {
+  const trimmed = name.trim();
+  if (trimmed.length === 0) return null;
+  return trimmed;
+};
+
+const initialPriceText = (price: number | null): string => {
+  if (price === null) return "";
+  return String(price);
+};
+
+const initialCurrencyText = (currency: string | null): string => {
+  if (currency === null) return "";
+  return currency;
+};
+
+const initialPurchasedOnText = (purchasedOn: string | null): string => {
+  if (purchasedOn === null) return "";
+  return purchasedOn;
+};
+
+const parsePriceInput = (raw: string): number | null => {
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return null;
+  const parsed = Number(trimmed.replace(",", "."));
+  if (Number.isNaN(parsed)) return null;
+  if (parsed < 0) return null;
+  return parsed;
+};
+
+const normaliseCurrencyInput = (raw: string): string | null => {
+  const trimmed = raw.trim().toUpperCase();
+  if (trimmed.length !== 3) return null;
+  if (!/^[A-Z]{3}$/.test(trimmed)) return null;
+  return trimmed;
+};
+
+const parsePurchasedOnInput = (raw: string): string | null => {
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return null;
+  return trimmed;
 };
 
 // Preserve any non-fit silhouette fields (length, rise) the vision pass set.

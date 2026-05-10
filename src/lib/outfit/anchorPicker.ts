@@ -1,4 +1,4 @@
-import type { Item, Category } from "../../types/items";
+import type { Item, Category, Occasion } from "../../types/items";
 import { recencyPenaltyForDaysAgo } from "../../features/outfits/tuning";
 import type { WeatherContext } from "./score";
 
@@ -11,13 +11,15 @@ export type AnchorPickerOptions = {
   closet: Item[];
   weather?: WeatherContext;
   recentlyWornItemIds?: Map<string, number>;
+  targetOccasion?: Occasion;
   count?: number;
 };
 
 export const pickAnchorsForToday = (opts: AnchorPickerOptions): Item[] => {
-  const { closet, weather, recentlyWornItemIds, count = 3 } = opts;
+  const { closet, weather, recentlyWornItemIds, targetOccasion, count = 3 } = opts;
 
-  const candidates = filterAnchorCandidates(closet);
+  const occasionFiltered = filterByOccasion(closet, targetOccasion);
+  const candidates = filterAnchorCandidates(occasionFiltered);
   if (candidates.length === 0) return [];
 
   const ranked = candidates
@@ -28,6 +30,17 @@ export const pickAnchorsForToday = (opts: AnchorPickerOptions): Item[] => {
     .sort((first, second) => second.score - first.score);
 
   return ranked.slice(0, count).map((entry) => entry.item);
+};
+
+const filterByOccasion = (
+  closet: Item[],
+  target: Occasion | undefined,
+): Item[] => {
+  if (target === undefined) return closet;
+  return closet.filter((item) => {
+    if (item.occasions.length === 0) return true;
+    return item.occasions.includes(target);
+  });
 };
 
 const filterAnchorCandidates = (closet: Item[]): Item[] => {

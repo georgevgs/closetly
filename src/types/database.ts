@@ -31,15 +31,20 @@ export type Database = {
           category: Database["public"]["Enums"]["item_category"]
           colors: Json
           created_at: string
+          currency: string | null
           formality: number
           id: string
           name: string | null
           notes: string | null
+          occasions: Database["public"]["Enums"]["occasion_tag"][]
           pattern: Database["public"]["Enums"]["item_pattern"]
           photo_path: string
+          price: number | null
+          purchased_on: string | null
           seasons: Database["public"]["Enums"]["season_tag"][]
           styles: Database["public"]["Enums"]["style_tag"][]
           thumb_path: string | null
+          times_washed: number
           updated_at: string
           user_id: string
           vision_attrs: Json
@@ -51,15 +56,20 @@ export type Database = {
           category: Database["public"]["Enums"]["item_category"]
           colors?: Json
           created_at?: string
+          currency?: string | null
           formality?: number
           id?: string
           name?: string | null
           notes?: string | null
+          occasions?: Database["public"]["Enums"]["occasion_tag"][]
           pattern?: Database["public"]["Enums"]["item_pattern"]
           photo_path: string
+          price?: number | null
+          purchased_on?: string | null
           seasons?: Database["public"]["Enums"]["season_tag"][]
           styles?: Database["public"]["Enums"]["style_tag"][]
           thumb_path?: string | null
+          times_washed?: number
           updated_at?: string
           user_id: string
           vision_attrs?: Json
@@ -196,6 +206,12 @@ export type Database = {
         }
         Returns: number
       }
+      increment_times_washed: {
+        Args: {
+          p_item_id: string
+        }
+        Returns: number
+      }
     }
     Enums: {
       item_category:
@@ -215,6 +231,14 @@ export type Database = {
         | "graphic"
         | "animal"
         | "print"
+      occasion_tag:
+        | "work"
+        | "casual"
+        | "formal"
+        | "sport"
+        | "date"
+        | "travel"
+        | "party"
       season_tag: "spring" | "summer" | "autumn" | "winter"
       style_tag:
         | "minimal"

@@ -1,6 +1,8 @@
 import { View, ScrollView, ActivityIndicator, Pressable } from "react-native";
 import { router } from "expo-router";
 import { useMemo } from "react";
+import { SymbolView } from "expo-symbols";
+import * as Haptics from "expo-haptics";
 
 import { Screen } from "~/components/ui/Screen";
 import { Section } from "~/components/ui/Section";
@@ -137,6 +139,7 @@ function ReadyState({
         pairAffinity={pairAffinity}
         recentlyWornItemIds={recentlyWornItemIds}
       />
+      <BuildOutfitPrompt />
       <Section
         title="Start with a piece"
         subtitle="Or pick your own starting piece for matching outfits."
@@ -147,6 +150,26 @@ function ReadyState({
         <ItemRow items={anchorCandidates.slice(-8).reverse()} />
       </Section>
     </>
+  );
+}
+
+function BuildOutfitPrompt() {
+  return (
+    <View className="px-6 mt-6">
+      <Pressable
+        onPress={openBuildOutfit}
+        className="rounded-xl border border-line dark:border-line-dark p-4 flex-row items-center"
+      >
+        <SymbolView name="square.grid.2x2" size={20} tintColor="#a8a29e" />
+        <View className="ml-3 flex-1">
+          <Text variant="headline">Build it yourself</Text>
+          <Text variant="caption" className="mt-0.5">
+            Pick a top, bottom and shoes — Closetly scores the combo as you go.
+          </Text>
+        </View>
+        <SymbolView name="chevron.right" size={14} tintColor="#a8a29e" />
+      </Pressable>
+    </View>
   );
 }
 
@@ -219,6 +242,11 @@ const joinForGuidance = (categories: Category[]): string => {
 
 const openSuggestForAnchor = (anchorId: string): void => {
   router.push({ pathname: "/outfits/suggest", params: { anchorId } });
+};
+
+const openBuildOutfit = (): void => {
+  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  router.push("/outfits/build");
 };
 
 const sortByAnchorPriority = (items: Item[]): Item[] => {

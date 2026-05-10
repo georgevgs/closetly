@@ -8,6 +8,7 @@ import { supabase } from "~/lib/supabase";
 import { useThemePreference, type ThemePreference } from "~/providers/ThemeProvider";
 import { useCategoryPrefs } from "~/providers/CategoryPrefsProvider";
 import { WearHistorySection } from "~/features/wear/components/WearHistorySection";
+import { WardrobeStatsSection } from "~/features/wear/components/WardrobeStatsSection";
 import { LegalLinks } from "~/features/legal/components/LegalLinks";
 import { useSuggestionInteractions } from "~/features/outfits/suggestionInteractions";
 import { CATEGORIES } from "~/types/items";
@@ -109,6 +110,8 @@ export default function ProfileScreen() {
               ))}
             </View>
           </View>
+
+          <WardrobeStatsSection userId={session?.user.id} />
 
           <WearHistorySection userId={session?.user.id} />
 

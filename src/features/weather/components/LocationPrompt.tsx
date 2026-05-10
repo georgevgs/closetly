@@ -17,7 +17,7 @@ export function LocationPrompt() {
   const handleEnable = async () => {
     const next = await request();
     if (next === "granted") {
-      queryClient.invalidateQueries({ queryKey: weatherKeys.current });
+      queryClient.invalidateQueries({ queryKey: weatherKeys.all });
     }
   };
 

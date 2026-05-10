@@ -4,6 +4,7 @@ import { Stack, useLocalSearchParams, router } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import * as Haptics from "expo-haptics";
 import { useColorScheme } from "nativewind";
+import { toast } from "sonner-native";
 
 import { Screen } from "~/components/ui/Screen";
 import { Text } from "~/components/ui/Text";
@@ -11,13 +12,16 @@ import { Button } from "~/components/ui/Button";
 import { Pill } from "~/components/ui/Pill";
 import { GlassSurface } from "~/components/ui/GlassSurface";
 import { useItem, useDeleteItem } from "~/features/closet/hooks/useItems";
+import { useMarkWashed } from "~/features/closet/hooks/useMarkWashed";
 import { signItemUrls } from "~/features/closet/mapper";
 import { useQuery } from "@tanstack/react-query";
+import type { Item } from "~/types/items";
 
 export default function ItemDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: item, isLoading } = useItem(id);
   const del = useDeleteItem();
+  const markWashed = useMarkWashed();
   const { colorScheme } = useColorScheme();
   const fg = colorScheme === "dark" ? "#f5f3ef" : "#1a1a1a";
 
@@ -118,17 +122,32 @@ export default function ItemDetail() {
             Tags
           </Text>
           <View className="flex-row flex-wrap gap-2">
-            {display.styles.map((s) => (
-              <Pill key={s} label={s} />
+            {display.styles.map((style) => (
+              <Pill key={style} label={style} />
             ))}
-            {display.seasons.map((s) => (
-              <Pill key={s} label={s} />
+            {display.seasons.map((season) => (
+              <Pill key={season} label={season} />
+            ))}
+            {display.occasions.map((occasion) => (
+              <Pill key={occasion} label={occasion} />
             ))}
             <Pill label={`formality ${display.formality}`} />
             <Pill label={`warmth ${display.warmth}`} />
             {display.pattern !== "solid" && <Pill label={display.pattern} />}
           </View>
         </View>
+
+        <PriceSection item={display} />
+        <CareSection
+          item={display}
+          marking={markWashed.isPending}
+          onMarkWashed={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            markWashed.mutate(display.id, {
+              onSuccess: () => toast.success("Wash logged"),
+            });
+          }}
+        />
 
         <Button
           label="Find outfits with this"
@@ -157,3 +176,62 @@ export default function ItemDetail() {
     </Screen>
   );
 }
+
+function PriceSection({ item }: { item: Item }) {
+  if (item.price === null && item.purchasedOn === null) return null;
+  return (
+    <View>
+      <Text variant="label" className="mb-2">
+        Purchase
+      </Text>
+      <View className="flex-row flex-wrap gap-2">
+        {item.price !== null && <Pill label={formatPrice(item.price, item.currency)} />}
+        {item.purchasedOn !== null && <Pill label={`bought ${item.purchasedOn}`} />}
+      </View>
+    </View>
+  );
+}
+
+function CareSection({
+  item,
+  marking,
+  onMarkWashed,
+}: {
+  item: Item;
+  marking: boolean;
+  onMarkWashed: () => void;
+}) {
+  return (
+    <View>
+      <Text variant="label" className="mb-2">
+        Care
+      </Text>
+      <View className="flex-row items-center justify-between">
+        <Text variant="body">{washCountLabel(item.timesWashed)}</Text>
+        <Button
+          label={markWashedLabel(marking)}
+          variant="secondary"
+          onPress={onMarkWashed}
+          disabled={marking}
+        />
+      </View>
+    </View>
+  );
+}
+
+const formatPrice = (price: number, currency: string | null): string => {
+  const fixed = price.toFixed(2);
+  if (currency === null) return fixed;
+  return `${fixed} ${currency}`;
+};
+
+const washCountLabel = (count: number): string => {
+  if (count === 0) return "Not yet washed";
+  if (count === 1) return "Washed once";
+  return `Washed ${count} times`;
+};
+
+const markWashedLabel = (marking: boolean): string => {
+  if (marking) return "Logging…";
+  return "Mark washed";
+};

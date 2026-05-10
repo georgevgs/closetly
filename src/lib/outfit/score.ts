@@ -221,23 +221,29 @@ const bumpTally = <K>(tally: Map<K, number>, key: K) => {
 };
 
 function scoreStyle(items: Item[], notes: string[]): number {
-  const tally = new Map<Style, number>();
-  for (const item of items) {
-    for (const s of item.styles) bumpTally(tally, s);
-  }
-  if (tally.size === 0) return 70;
+  const styled = items.filter((item) => item.styles.length > 0);
+  if (styled.length === 0) return 70;
 
-  const dominant = [...tally.entries()].sort((a, b) => b[1] - a[1])[0][0];
+  const tally = new Map<Style, number>();
+  for (const item of styled) {
+    for (const style of item.styles) bumpTally(tally, style);
+  }
+
+  const dominant = [...tally.entries()].sort(
+    (firstEntry, secondEntry) => secondEntry[1] - firstEntry[1],
+  )[0][0];
   const compatible = new Set<Style>([dominant, ...STYLE_ADJACENCY[dominant]]);
 
   let direct = 0;
   let adjacent = 0;
-  for (const item of items) {
+  for (const item of styled) {
     if (item.styles.includes(dominant)) direct++;
-    else if (item.styles.some((s) => compatible.has(s))) adjacent++;
+    else if (item.styles.some((style) => compatible.has(style))) adjacent++;
   }
-  const directRatio = direct / items.length;
-  const compatibleRatio = (direct + adjacent) / items.length;
+  // Denominator is the styled count, not the full outfit, so an item with no
+  // tags is treated as neutral rather than silently dragging the ratio down.
+  const directRatio = direct / styled.length;
+  const compatibleRatio = (direct + adjacent) / styled.length;
 
   if (compatibleRatio >= 0.75) {
     if (directRatio >= 0.75) {

@@ -1,4 +1,4 @@
-import type { Item } from "../../types/items";
+import type { Item, Occasion } from "../../types/items";
 import { suggestOutfits, type OutfitSuggestion } from "./combinator";
 import { pickAnchorsForToday } from "./anchorPicker";
 import type { WeatherContext } from "./score";
@@ -8,16 +8,25 @@ export type TodayOutfitOptions = {
   weather?: WeatherContext;
   pairAffinity?: Map<string, number>;
   recentlyWornItemIds?: Map<string, number>;
+  targetOccasion?: Occasion;
   count?: number;
 };
 
 export const suggestTodayOutfits = (opts: TodayOutfitOptions): OutfitSuggestion[] => {
-  const { closet, weather, pairAffinity, recentlyWornItemIds, count = 3 } = opts;
+  const {
+    closet,
+    weather,
+    pairAffinity,
+    recentlyWornItemIds,
+    targetOccasion,
+    count = 3,
+  } = opts;
 
   const anchors = pickAnchorsForToday({
     closet,
     weather,
     recentlyWornItemIds,
+    targetOccasion,
     count,
   });
   if (anchors.length === 0) return [];
@@ -30,6 +39,7 @@ export const suggestTodayOutfits = (opts: TodayOutfitOptions): OutfitSuggestion[
       weather,
       pairAffinity,
       recentlyWornItemIds,
+      targetOccasion,
       limit: 3,
     });
     all.push(...fromAnchor);

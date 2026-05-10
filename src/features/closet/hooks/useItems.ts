@@ -10,6 +10,7 @@ import type {
   Formality,
   Warmth,
   Silhouette,
+  Occasion,
 } from "~/types/items";
 import type { Json, TablesUpdate } from "~/types/database";
 import { itemFromRow, type ItemRow } from "../mapper";
@@ -76,6 +77,10 @@ export type UpdateItemInput = {
   pattern: Pattern;
   formality: Formality;
   warmth: Warmth;
+  occasions: Occasion[];
+  price: number | null;
+  currency: string | null;
+  purchasedOn: string | null;
   silhouette?: Silhouette | null;
 };
 
@@ -83,13 +88,16 @@ export function useUpdateItem() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: UpdateItemInput) => {
-      const { id, silhouette, ...columns } = input;
+      const { id, silhouette, purchasedOn, ...columns } = input;
 
       if (silhouette !== undefined) {
         await writeSilhouette(id, silhouette);
       }
 
-      const { error } = await supabase.from("items").update(columns).eq("id", id);
+      const { error } = await supabase
+        .from("items")
+        .update({ ...columns, purchased_on: purchasedOn })
+        .eq("id", id);
       if (error) throw error;
     },
     onSuccess: (_, vars) => {

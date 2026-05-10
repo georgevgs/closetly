@@ -1,4 +1,4 @@
-import type { Item, Category } from "../../types/items";
+import type { Item, Category, Occasion } from "../../types/items";
 import { scoreOutfit, type ScoreBreakdown, type WeatherContext } from "./score";
 
 export type OutfitSuggestion = {
@@ -12,6 +12,7 @@ export type CombinatorOptions = {
   weather?: WeatherContext;
   pairAffinity?: Map<string, number>;
   recentlyWornItemIds?: Map<string, number>;
+  targetOccasion?: Occasion;
   limit?: number;
   includeOuterwear?: boolean;
 };
@@ -23,12 +24,14 @@ export function suggestOutfits(opts: CombinatorOptions): OutfitSuggestion[] {
     weather,
     pairAffinity,
     recentlyWornItemIds,
+    targetOccasion,
     limit = 10,
     includeOuterwear,
   } = opts;
 
+  const filteredCloset = filterClosetByOccasion(closet, anchor, targetOccasion);
   const slots = pickSlots(anchor, includeOuterwear ?? shouldAddOuter(weather));
-  const buckets = bucketByCategory(closet, anchor);
+  const buckets = bucketByCategory(filteredCloset, anchor);
   const candidates = slots.map((slot) => {
     if (slot === anchor.category) return [anchor];
     return buckets.get(slot) ?? [];
@@ -56,6 +59,23 @@ export function suggestOutfits(opts: CombinatorOptions): OutfitSuggestion[] {
     .sort((a, b) => b.score.total - a.score.total)
     .slice(0, limit);
 }
+
+// The anchor itself is always included even if it doesn't match the
+// occasion — the user picked it explicitly. The filter only narrows the
+// supporting pieces. Items with no occasions stay neutral so a closet
+// where most pieces are untagged still produces suggestions.
+const filterClosetByOccasion = (
+  closet: Item[],
+  anchor: Item,
+  target: Occasion | undefined,
+): Item[] => {
+  if (target === undefined) return closet;
+  return closet.filter((item) => {
+    if (item.id === anchor.id) return true;
+    if (item.occasions.length === 0) return true;
+    return item.occasions.includes(target);
+  });
+};
 
 function pickSlots(anchor: Item, withOuterwear: boolean): Category[] {
   if (anchor.category === "dress") {
@@ -93,22 +113,39 @@ function prefilter(items: Item[], anchor: Item, w?: WeatherContext): Item[] {
 }
 
 function quickPairScore(item: Item, anchor: Item, w?: WeatherContext): number {
-  let s = 50;
-  const formalityDiff = Math.abs(item.formality - anchor.formality);
-  s += formalityDiff <= 1 ? 15 : -formalityDiff * 8;
-  const styleOverlap = item.styles.filter((x) => anchor.styles.includes(x)).length;
-  s += styleOverlap * 6;
-  if (w) {
-    const seasonOk =
-      w.tempC >= 18
-        ? item.seasons.includes("summer") || item.seasons.includes("spring")
-        : w.tempC >= 10
-          ? item.seasons.includes("spring") || item.seasons.includes("autumn")
-          : item.seasons.includes("autumn") || item.seasons.includes("winter");
-    s += seasonOk ? 8 : -6;
-  }
-  return s;
+  let score = 50;
+  score += formalityAdjustment(item, anchor);
+  score += styleOverlapBonus(item, anchor);
+  if (w) score += seasonAdjustment(item, w);
+  return score;
 }
+
+const formalityAdjustment = (item: Item, anchor: Item): number => {
+  const diff = Math.abs(item.formality - anchor.formality);
+  if (diff <= 1) return 15;
+  return -diff * 8;
+};
+
+const styleOverlapBonus = (item: Item, anchor: Item): number => {
+  const overlap = item.styles.filter((style) => anchor.styles.includes(style)).length;
+  return overlap * 6;
+};
+
+// Items with no seasons set are "user hasn't decided" — treat as neutral
+// instead of a -6 penalty (which previously hid them behind explicitly-tagged
+// items). The anchorPicker already takes the same neutral stance; this aligns
+// the prefilter with it.
+const seasonAdjustment = (item: Item, w: WeatherContext): number => {
+  if (item.seasons.length === 0) return 0;
+  if (matchesCurrentSeasons(item.seasons, w.tempC)) return 8;
+  return -6;
+};
+
+const matchesCurrentSeasons = (seasons: Item["seasons"], tempC: number): boolean => {
+  if (tempC >= 18) return seasons.includes("summer") || seasons.includes("spring");
+  if (tempC >= 10) return seasons.includes("spring") || seasons.includes("autumn");
+  return seasons.includes("autumn") || seasons.includes("winter");
+};
 
 function buildCombos(buckets: Item[][], idx: number, acc: Item[], out: Item[][]) {
   if (idx === buckets.length) {

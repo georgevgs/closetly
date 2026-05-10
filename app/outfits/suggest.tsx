@@ -4,6 +4,7 @@ import { useLocalSearchParams } from "expo-router";
 
 import { Screen } from "~/components/ui/Screen";
 import { Text } from "~/components/ui/Text";
+import { Pill } from "~/components/ui/Pill";
 import { GlassSurface } from "~/components/ui/GlassSurface";
 import { useAuth } from "~/features/auth/context";
 import { useSignedItems } from "~/features/closet/hooks/useSignedItems";
@@ -14,7 +15,7 @@ import { useWeather, type WeatherSnapshot } from "~/features/weather/useWeather"
 import { suggestOutfits, type OutfitSuggestion } from "~/lib/outfit/combinator";
 import { SuggestionsList } from "~/features/outfits/components/SuggestionsList";
 import { toWeatherContext } from "~/features/outfits/weatherContext";
-import type { Item } from "~/types/items";
+import { OCCASIONS, type Item, type Occasion } from "~/types/items";
 
 const SUGGEST_LIMIT = 8;
 
@@ -26,6 +27,7 @@ export default function SuggestScreen() {
   const { data: recentlyWornItemIds } = useRecentWears(session?.user.id);
   const { data: weather } = useWeather();
   const actions = useOutfitActions(weather);
+  const [targetOccasion, setTargetOccasion] = useState<Occasion | null>(null);
 
   const anchor = items?.find((item) => item.id === anchorId);
   const { suggestions, isComputing } = useDeferredAnchorSuggestions({
@@ -34,6 +36,7 @@ export default function SuggestScreen() {
     weather,
     pairAffinity,
     recentlyWornItemIds,
+    targetOccasion,
   });
 
   if (isLoading) {
@@ -56,6 +59,7 @@ export default function SuggestScreen() {
     <Screen>
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
         <AnchorHeader anchor={anchor} weather={weather} />
+        <OccasionPicker selected={targetOccasion} onSelect={setTargetOccasion} />
         {isComputing && <ComputingState />}
         {!isComputing && (
           <SuggestionsList
@@ -106,6 +110,41 @@ function ComputingState() {
   );
 }
 
+function OccasionPicker({
+  selected,
+  onSelect,
+}: {
+  selected: Occasion | null;
+  onSelect: (next: Occasion | null) => void;
+}) {
+  return (
+    <View>
+      <Text variant="caption" className="uppercase tracking-widest mb-2">
+        Occasion
+      </Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ gap: 8 }}
+      >
+        <Pill
+          label="Any"
+          selected={selected === null}
+          onPress={() => onSelect(null)}
+        />
+        {OCCASIONS.map((occasion) => (
+          <Pill
+            key={occasion}
+            label={occasion}
+            selected={selected === occasion}
+            onPress={() => onSelect(occasion)}
+          />
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
 // Same deferral pattern as the Today screen — the combinator can score
 // hundreds of outfits per anchor and would otherwise stall the navigation
 // transition into this screen.
@@ -115,12 +154,14 @@ const useDeferredAnchorSuggestions = ({
   weather,
   pairAffinity,
   recentlyWornItemIds,
+  targetOccasion,
 }: {
   anchor: Item | undefined;
   items: Item[] | undefined;
   weather: WeatherSnapshot | null | undefined;
   pairAffinity: Map<string, number> | undefined;
   recentlyWornItemIds: Map<string, number> | undefined;
+  targetOccasion: Occasion | null;
 }): { suggestions: OutfitSuggestion[]; isComputing: boolean } => {
   const [suggestions, setSuggestions] = useState<OutfitSuggestion[]>([]);
   const [isComputing, setIsComputing] = useState(true);
@@ -141,6 +182,7 @@ const useDeferredAnchorSuggestions = ({
         weather: toWeatherContext(weather),
         pairAffinity,
         recentlyWornItemIds,
+        targetOccasion: occasionOrUndefined(targetOccasion),
         limit: SUGGEST_LIMIT,
       });
       setSuggestions(computed);
@@ -150,9 +192,14 @@ const useDeferredAnchorSuggestions = ({
       cancelled = true;
       handle.cancel();
     };
-  }, [anchor, items, weather, pairAffinity, recentlyWornItemIds]);
+  }, [anchor, items, weather, pairAffinity, recentlyWornItemIds, targetOccasion]);
 
   return { suggestions, isComputing };
+};
+
+const occasionOrUndefined = (occasion: Occasion | null): Occasion | undefined => {
+  if (occasion === null) return undefined;
+  return occasion;
 };
 
 const anchorTitle = (item: Item): string => {

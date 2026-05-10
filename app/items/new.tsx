@@ -42,12 +42,14 @@ import {
   STYLES,
   SEASONS,
   PATTERNS,
+  OCCASIONS,
   type Category,
   type Style,
   type Season,
   type Pattern,
   type Formality,
   type Warmth,
+  type Occasion,
   type VisionAttrs,
 } from "~/types/items";
 
@@ -106,6 +108,10 @@ export default function NewItemScreen() {
   const [pattern, setPattern] = useState<Pattern>("solid");
   const [formality, setFormality] = useState<Formality>(3);
   const [warmth, setWarmth] = useState<Warmth>(INITIAL_WARMTH);
+  const [occasions, setOccasions] = useState<Set<Occasion>>(new Set());
+  const [priceText, setPriceText] = useState("");
+  const [currencyText, setCurrencyText] = useState("");
+  const [purchasedOnText, setPurchasedOnText] = useState("");
 
   useEffect(() => {
     if (seasonsTouched) return;
@@ -225,6 +231,10 @@ export default function NewItemScreen() {
         pattern,
         formality,
         warmth,
+        occasions: [...occasions],
+        price: parsePriceInput(priceText),
+        currency: normaliseCurrencyInput(currencyText),
+        purchased_on: parsePurchasedOnInput(purchasedOnText),
         colors,
         visionAttrs: visionAttrsRef.current,
       },
@@ -432,6 +442,55 @@ export default function NewItemScreen() {
           </View>
         </Section>
 
+        {/* Occasions */}
+        <Section title="Occasions" subtitle="Optional — when you'd reach for this piece">
+          <View className="flex-row flex-wrap gap-2">
+            {OCCASIONS.map((occasion) => (
+              <Pill
+                key={occasion}
+                label={occasion}
+                selected={occasions.has(occasion)}
+                onPress={() => toggle(occasions, occasion, setOccasions)}
+              />
+            ))}
+          </View>
+        </Section>
+
+        {/* Price */}
+        <Section title="Price" subtitle="Optional — used for cost-per-wear">
+          <View className="flex-row gap-2">
+            <TextInput
+              value={priceText}
+              onChangeText={setPriceText}
+              keyboardType="decimal-pad"
+              placeholder="0.00"
+              placeholderTextColor="#a8a29e"
+              className="flex-1 h-12 px-4 rounded-lg border border-line dark:border-line-dark text-ink dark:text-ink-dark"
+            />
+            <TextInput
+              value={currencyText}
+              onChangeText={setCurrencyText}
+              autoCapitalize="characters"
+              maxLength={3}
+              placeholder="USD"
+              placeholderTextColor="#a8a29e"
+              className="w-24 h-12 px-4 rounded-lg border border-line dark:border-line-dark text-ink dark:text-ink-dark"
+            />
+          </View>
+        </Section>
+
+        {/* Purchased on */}
+        <Section title="Purchased on" subtitle="Optional — YYYY-MM-DD">
+          <TextInput
+            value={purchasedOnText}
+            onChangeText={setPurchasedOnText}
+            placeholder="2026-05-10"
+            placeholderTextColor="#a8a29e"
+            keyboardType="numbers-and-punctuation"
+            className="h-12 px-4 rounded-lg border border-line dark:border-line-dark text-ink dark:text-ink-dark"
+          />
+        </Section>
+
         <Button
           label="Save to closet"
           onPress={save}
@@ -446,6 +505,31 @@ export default function NewItemScreen() {
 const seasonsSubtitle = (touched: boolean): string => {
   if (touched) return "Pick all that apply";
   return "Suggested from warmth — tap to adjust";
+};
+
+const parsePriceInput = (raw: string): number | null => {
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return null;
+  const parsed = Number(trimmed.replace(",", "."));
+  if (Number.isNaN(parsed)) return null;
+  if (parsed < 0) return null;
+  return parsed;
+};
+
+const normaliseCurrencyInput = (raw: string): string | null => {
+  const trimmed = raw.trim().toUpperCase();
+  if (trimmed.length !== 3) return null;
+  if (!/^[A-Z]{3}$/.test(trimmed)) return null;
+  return trimmed;
+};
+
+// Validates loosely — Postgres rejects malformed dates with a clear error;
+// we just want to avoid sending obvious garbage like "tomorrow".
+const parsePurchasedOnInput = (raw: string): string | null => {
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return null;
+  return trimmed;
 };
 
 const renderSubtitleSlot = (subtitle?: string): React.ReactNode => {
