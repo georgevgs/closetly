@@ -172,7 +172,31 @@ export type Database = {
       }
     }
     Views: Record<string, never>
-    Functions: Record<string, never>
+    Functions: {
+      bump_pair_affinity: {
+        Args: {
+          p_user_id: string
+          p_pairs: Json
+          p_delta: number
+          p_min: number
+          p_max: number
+        }
+        Returns: void
+      }
+      increment_outfit_worn_count: {
+        Args: {
+          p_outfit_id: string
+          p_set_last_worn?: boolean
+        }
+        Returns: number
+      }
+      decrement_outfit_worn_count: {
+        Args: {
+          p_outfit_id: string
+        }
+        Returns: number
+      }
+    }
     Enums: {
       item_category:
         | "top"

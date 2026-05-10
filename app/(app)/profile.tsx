@@ -9,6 +9,7 @@ import { useThemePreference, type ThemePreference } from "~/providers/ThemeProvi
 import { useCategoryPrefs } from "~/providers/CategoryPrefsProvider";
 import { WearHistorySection } from "~/features/wear/components/WearHistorySection";
 import { LegalLinks } from "~/features/legal/components/LegalLinks";
+import { useSuggestionInteractions } from "~/features/outfits/suggestionInteractions";
 import { CATEGORIES } from "~/types/items";
 import { cn } from "~/lib/utils";
 import { handleError } from "~/lib/handleError";
@@ -35,9 +36,17 @@ export default function ProfileScreen() {
   const { preference, setPreference } = useThemePreference();
   const { isHidden, toggle } = useCategoryPrefs();
 
+  const resetSuggestionInteractions = useSuggestionInteractions(
+    (state) => state.reset,
+  );
+
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
-    if (error) handleError(error, { fallbackMessage: "Couldn't sign out." });
+    if (error) {
+      handleError(error, { fallbackMessage: "Couldn't sign out." });
+      return;
+    }
+    resetSuggestionInteractions();
   };
 
   return (

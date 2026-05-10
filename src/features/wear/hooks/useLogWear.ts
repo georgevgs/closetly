@@ -106,21 +106,10 @@ const insertWearLog = async (
 };
 
 const markOutfitWorn = async (outfitId: string): Promise<void> => {
-  const { data: current, error: readError } = await supabase
-    .from("outfits")
-    .select("worn_count")
-    .eq("id", outfitId)
-    .single();
-  if (readError) throw readError;
-  if (!current) throw new Error("Outfit not found");
-
-  const { error } = await supabase
-    .from("outfits")
-    .update({
-      worn_count: current.worn_count + 1,
-      last_worn_at: new Date().toISOString(),
-    })
-    .eq("id", outfitId);
+  const { error } = await supabase.rpc("increment_outfit_worn_count", {
+    p_outfit_id: outfitId,
+    p_set_last_worn: true,
+  });
   if (error) throw error;
 };
 

@@ -13,10 +13,24 @@ import { usePairAffinity } from "~/features/outfits/hooks/usePairAffinity";
 import { useRecentWears } from "~/features/wear/hooks/useRecentWears";
 import { TodayOutfitsSection } from "~/features/outfits/components/TodayOutfitsSection";
 import { LocationPrompt } from "~/features/weather/components/LocationPrompt";
+import {
+  assessClosetViability,
+  type ClosetViability,
+} from "~/lib/outfit/closetViability";
 import type { Item, Category } from "~/types/items";
 
 const ANCHOR_PRIORITY: Category[] = ["bottom", "outerwear", "dress", "top", "shoes"];
-const MIN_ITEMS_FOR_SUGGESTIONS = 3;
+
+const CATEGORY_LABELS: Record<Category, string> = {
+  top: "a top",
+  bottom: "a bottom",
+  dress: "a dress",
+  outerwear: "outerwear",
+  shoes: "shoes",
+  bag: "a bag",
+  hat: "a hat",
+  accessory: "an accessory",
+};
 
 export default function TodayScreen() {
   const { session } = useAuth();
@@ -30,6 +44,11 @@ export default function TodayScreen() {
     return sortByAnchorPriority(items);
   }, [items]);
 
+  const viability = useMemo(() => {
+    if (!items) return null;
+    return assessClosetViability(items);
+  }, [items]);
+
   return (
     <Screen>
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
@@ -37,6 +56,7 @@ export default function TodayScreen() {
         <LocationPrompt />
         <HomeBody
           isLoading={isLoading}
+          viability={viability}
           anchorCandidates={anchorCandidates}
           weather={weather}
           pairAffinity={pairAffinity}
@@ -63,19 +83,23 @@ function Greeting({ weather }: { weather: WeatherSnapshot | null | undefined }) 
 
 function HomeBody({
   isLoading,
+  viability,
   anchorCandidates,
   weather,
   pairAffinity,
   recentlyWornItemIds,
 }: {
   isLoading: boolean;
+  viability: ClosetViability | null;
   anchorCandidates: Item[];
   weather: WeatherSnapshot | null | undefined;
   pairAffinity: Map<string, number> | undefined;
   recentlyWornItemIds: Map<string, number> | undefined;
 }) {
   if (isLoading) return <LoadingState />;
-  if (anchorCandidates.length < MIN_ITEMS_FOR_SUGGESTIONS) return <ColdStart />;
+  if (!viability) return <LoadingState />;
+  if (viability.kind === "empty") return <EmptyCloset />;
+  if (viability.kind === "missing") return <IncompleteCloset missing={viability.missing} />;
   return (
     <ReadyState
       anchorCandidates={anchorCandidates}
@@ -142,15 +166,33 @@ function ItemRow({ items }: { items: Item[] }) {
   );
 }
 
-function ColdStart() {
+function EmptyCloset() {
+  return (
+    <ColdStartCard
+      title="Add your first piece"
+      message="Closetly needs a top, bottom and shoes (or a dress + shoes) to suggest combinations."
+    />
+  );
+}
+
+function IncompleteCloset({ missing }: { missing: Category[] }) {
+  return (
+    <ColdStartCard
+      title="Almost there"
+      message={`Add ${joinForGuidance(missing)} to start matching outfits.`}
+    />
+  );
+}
+
+function ColdStartCard({ title, message }: { title: string; message: string }) {
   return (
     <View className="px-6 mt-12">
       <View className="rounded-xl border border-line dark:border-line-dark p-6">
         <Text variant="headline" className="mb-2">
-          Add at least 3 pieces
+          {title}
         </Text>
         <Text variant="caption" className="mb-4">
-          Closetly needs a top, bottom and shoes (or a dress + shoes) to suggest combinations.
+          {message}
         </Text>
         <Pressable
           onPress={() => router.push("/items/new")}
@@ -164,6 +206,16 @@ function ColdStart() {
     </View>
   );
 }
+
+const joinForGuidance = (categories: Category[]): string => {
+  const labels = categories.map((category) => CATEGORY_LABELS[category]);
+  if (labels.length === 0) return "another piece";
+  if (labels.length === 1) return labels[0];
+  if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
+  const head = labels.slice(0, -1).join(", ");
+  const tail = labels[labels.length - 1];
+  return `${head}, and ${tail}`;
+};
 
 const openSuggestForAnchor = (anchorId: string): void => {
   router.push({ pathname: "/outfits/suggest", params: { anchorId } });

@@ -1,8 +1,12 @@
-import { useState } from "react";
+import { useMemo } from "react";
 import { toast } from "sonner-native";
 import type { OutfitSuggestion } from "~/lib/outfit/combinator";
 import type { WeatherSnapshot } from "~/features/weather/useWeather";
 import { useLogWear } from "~/features/wear/hooks/useLogWear";
+import {
+  useSuggestionInteractions,
+  type SuggestionStatus,
+} from "~/features/outfits/suggestionInteractions";
 import { useSaveOutfit } from "./useSaveOutfit";
 import { useDismissSuggestion } from "./useDismissSuggestion";
 
@@ -21,9 +25,26 @@ export function useOutfitActions(
   const save = useSaveOutfit();
   const wear = useLogWear();
   const dismiss = useDismissSuggestion();
-  const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set());
-  const [wornKeys, setWornKeys] = useState<Set<string>>(new Set());
-  const [dismissedKeys, setDismissedKeys] = useState<Set<string>>(new Set());
+
+  const byKey = useSuggestionInteractions((state) => state.byKey);
+  const markSaved = useSuggestionInteractions((state) => state.markSaved);
+  const markWorn = useSuggestionInteractions((state) => state.markWorn);
+  const markDismissed = useSuggestionInteractions(
+    (state) => state.markDismissed,
+  );
+
+  const savedKeys = useMemo(
+    () => keysWhere(byKey, (status) => status.saved),
+    [byKey],
+  );
+  const wornKeys = useMemo(
+    () => keysWhere(byKey, (status) => status.worn),
+    [byKey],
+  );
+  const dismissedKeys = useMemo(
+    () => keysWhere(byKey, (status) => status.dismissed),
+    [byKey],
+  );
 
   const handleSave = (suggestion: OutfitSuggestion, key: string) => {
     if (savedKeys.has(key)) return;
@@ -31,7 +52,7 @@ export function useOutfitActions(
       { items: suggestion.items, favorite: true, rating: 5 },
       {
         onSuccess: () => {
-          setSavedKeys((previous) => addTo(previous, key));
+          markSaved(key);
           toast.success("Saved to favorites");
         },
       },
@@ -44,7 +65,7 @@ export function useOutfitActions(
       { items: suggestion.items, weather },
       {
         onSuccess: () => {
-          setWornKeys((previous) => addTo(previous, key));
+          markWorn(key);
           toast.success("Logged for today");
         },
       },
@@ -53,8 +74,12 @@ export function useOutfitActions(
 
   const handleDismiss = (suggestion: OutfitSuggestion, key: string) => {
     if (dismissedKeys.has(key)) return;
-    setDismissedKeys((previous) => addTo(previous, key));
-    dismiss.mutate({ items: suggestion.items });
+    dismiss.mutate(
+      { items: suggestion.items },
+      {
+        onSuccess: () => markDismissed(key),
+      },
+    );
   };
 
   return {
@@ -67,8 +92,13 @@ export function useOutfitActions(
   };
 }
 
-const addTo = (set: Set<string>, key: string): Set<string> => {
-  const next = new Set(set);
-  next.add(key);
-  return next;
+const keysWhere = (
+  byKey: Map<string, SuggestionStatus>,
+  predicate: (status: SuggestionStatus) => boolean,
+): Set<string> => {
+  const result = new Set<string>();
+  for (const [key, status] of byKey) {
+    if (predicate(status)) result.add(key);
+  }
+  return result;
 };

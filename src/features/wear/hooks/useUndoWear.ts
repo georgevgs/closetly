@@ -65,25 +65,10 @@ const fetchOutfitItemIds = async (outfitId: string): Promise<string[]> => {
 };
 
 const decrementWornCount = async (outfitId: string): Promise<void> => {
-  const { data: current, error: readError } = await supabase
-    .from("outfits")
-    .select("worn_count")
-    .eq("id", outfitId)
-    .maybeSingle();
-  if (readError) throw readError;
-  if (!current) return;
-
-  const nextCount = nextWornCount(current.worn_count);
-  const { error } = await supabase
-    .from("outfits")
-    .update({ worn_count: nextCount })
-    .eq("id", outfitId);
+  const { error } = await supabase.rpc("decrement_outfit_worn_count", {
+    p_outfit_id: outfitId,
+  });
   if (error) throw error;
-};
-
-const nextWornCount = (current: number): number => {
-  if (current <= 1) return 0;
-  return current - 1;
 };
 
 const deleteWearLog = async (wearLogId: string): Promise<void> => {
