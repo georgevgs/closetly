@@ -81,6 +81,7 @@ export type Item = {
 
 export type VisionAttrs = {
   colors: { hex: string }[];
+  silhouette?: Silhouette;
 };
 
 export type Outfit = {

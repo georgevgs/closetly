@@ -48,7 +48,8 @@ export function scoreOutfit(
   const formalityScore = scoreFormality(items, notes);
   const styleScore = scoreStyle(items, notes);
   const patternScore = scorePattern(items, notes);
-  const weatherScore = opts.weather ? scoreWeather(items, opts.weather, notes) : 75;
+  let weatherScore = 75;
+  if (opts.weather) weatherScore = scoreWeather(items, opts.weather, notes);
   const balanceScore = scoreBalance(items, notes);
 
   let total =
@@ -62,7 +63,6 @@ export function scoreOutfit(
   if (opts.pairAffinity && opts.pairAffinity.size > 0 && items.length >= 2) {
     let bonus = 0;
     let known = 0;
-    const totalPairs = (items.length * (items.length - 1)) / 2;
     for (let i = 0; i < items.length; i++) {
       for (let j = i + 1; j < items.length; j++) {
         const k = pairKey(items[i].id, items[j].id);
@@ -74,7 +74,7 @@ export function scoreOutfit(
       }
     }
     if (known > 0) {
-      const avg = bonus / totalPairs;
+      const avg = bonus / known;
       total += avg * 5;
       if (avg > 0.3) notes.push("Boosted by your favorites");
     }
@@ -131,10 +131,19 @@ function scoreFormality(items: Item[], notes: string[]): number {
   return 35;
 }
 
+const bumpTally = <K>(tally: Map<K, number>, key: K) => {
+  const current = tally.get(key);
+  if (current === undefined) {
+    tally.set(key, 1);
+    return;
+  }
+  tally.set(key, current + 1);
+};
+
 function scoreStyle(items: Item[], notes: string[]): number {
   const tally = new Map<Style, number>();
   for (const item of items) {
-    for (const s of item.styles) tally.set(s, (tally.get(s) ?? 0) + 1);
+    for (const s of item.styles) bumpTally(tally, s);
   }
   if (tally.size === 0) return 70;
 
@@ -164,7 +173,7 @@ function scoreStyle(items: Item[], notes: string[]): number {
 
 function scorePattern(items: Item[], notes: string[]): number {
   const patterned = items.filter((i) => i.pattern !== "solid");
-  if (patterned.length === 0) return 90;
+  if (patterned.length === 0) return 100;
   if (patterned.length === 1) return 100;
   if (patterned.length === 2) {
     notes.push("Two patterns — risky unless intentional");
@@ -203,21 +212,27 @@ function scoreBalance(items: Item[], notes: string[]): number {
   const top = items.find((i) => i.category === "top");
   const bottom = items.find((i) => i.category === "bottom");
   const dress = items.find((i) => i.category === "dress");
+  const outer = items.find((i) => i.category === "outerwear");
 
-  if (dress && !top && !bottom) return 75;
-  if (!top || !bottom) return 75;
+  // When outerwear is worn it dominates the visible top-half silhouette.
+  let upper = outer;
+  if (!upper) upper = top;
+  let lower = bottom;
+  if (!lower) lower = dress;
 
-  const topVol = volumeOf(top);
-  const botVol = volumeOf(bottom);
-  if (topVol == null || botVol == null) return 75;
+  if (!upper || !lower) return 75;
 
-  const diff = Math.abs(topVol - botVol);
+  const upperVol = volumeOf(upper);
+  const lowerVol = volumeOf(lower);
+  if (upperVol == null || lowerVol == null) return 75;
+
+  const diff = Math.abs(upperVol - lowerVol);
   if (diff === 0) {
-    if (topVol >= 4) {
+    if (upperVol >= 4) {
       notes.push("Both pieces oversized — silhouette feels shapeless");
       return 55;
     }
-    if (topVol === 3) {
+    if (upperVol === 3) {
       notes.push("Both pieces relaxed — risk of looking sloppy");
       return 72;
     }
@@ -240,7 +255,8 @@ const FIT_VOLUME: Record<NonNullable<Item["silhouette"]>["fit"], number> = {
 
 function volumeOf(item: Item): number | null {
   const fit = item.silhouette?.fit;
-  return fit ? FIT_VOLUME[fit] : null;
+  if (!fit) return null;
+  return FIT_VOLUME[fit];
 }
 
 function warmthForTemp(t: number): number {
@@ -252,5 +268,6 @@ function warmthForTemp(t: number): number {
 }
 
 export function pairKey(a: string, b: string): string {
-  return a < b ? `${a}|${b}` : `${b}|${a}`;
+  if (a < b) return `${a}|${b}`;
+  return `${b}|${a}`;
 }

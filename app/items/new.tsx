@@ -24,8 +24,16 @@ import {
   type Swatch,
 } from "~/lib/color/extract";
 import { useCreateItem } from "~/features/closet/hooks/useCreateItem";
-import { analyzeItemFromUri } from "~/features/closet/vision";
-import { isBgRemovalAvailable, removeBackground } from "expo-bg-remover";
+import {
+  analyzeItemFromUri,
+  attrsFromMaskedColors,
+  inferSilhouetteFromMask,
+} from "~/features/closet/vision";
+import {
+  isBgRemovalAvailable,
+  removeBackground,
+  type BgRemoveResult,
+} from "expo-bg-remover";
 import { useCategoryPrefs } from "~/providers/CategoryPrefsProvider";
 import {
   CATEGORIES,
@@ -41,10 +49,44 @@ import {
   type VisionAttrs,
 } from "~/types/items";
 
+const pickInitialCategory = (visible: readonly Category[]): Category => {
+  if (visible.length > 0) return visible[0];
+  return CATEGORIES[0];
+};
+
+const nameOrNull = (raw: string): string | null => {
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return null;
+  return trimmed;
+};
+
+const swatchBorderClass = (selected: boolean): string => {
+  if (selected) return "border-ink dark:border-ink-dark";
+  return "border-line dark:border-line-dark";
+};
+
+const ordinalLabel = (index: number): string => {
+  if (index === 0) return "1st";
+  if (index === 1) return "2nd";
+  return "3rd";
+};
+
+const PICKER_OPTIONS: Parameters<typeof ImagePicker.launchCameraAsync>[0] = {
+  mediaTypes: ["images"],
+  quality: 0.9,
+  allowsEditing: true,
+  aspect: [1, 1],
+};
+
+const launchPicker = (source: "camera" | "library") => {
+  if (source === "camera") return ImagePicker.launchCameraAsync(PICKER_OPTIONS);
+  return ImagePicker.launchImageLibraryAsync(PICKER_OPTIONS);
+};
+
 export default function NewItemScreen() {
   const create = useCreateItem();
   const { visible: visibleCategories } = useCategoryPrefs();
-  const initialCategory: Category = visibleCategories[0] ?? CATEGORIES[0];
+  const initialCategory = pickInitialCategory(visibleCategories);
 
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [picks, setPicks] = useState<Swatch[]>([]);
@@ -63,8 +105,7 @@ export default function NewItemScreen() {
   const [autoFilled, setAutoFilled] = useState(false);
   const colorsTouchedRef = useRef(false);
   const visionAttrsRef = useRef<VisionAttrs | null>(null);
-  const visionReqRef = useRef(0);
-  const trimReqRef = useRef(0);
+  const analyzeReqRef = useRef(0);
 
   async function pickPhoto(source: "camera" | "library") {
     if (source === "camera") {
@@ -74,52 +115,62 @@ export default function NewItemScreen() {
         return;
       }
     }
-    const result =
-      source === "camera"
-        ? await ImagePicker.launchCameraAsync({
-            mediaTypes: ["images"],
-            quality: 0.9,
-            allowsEditing: true,
-            aspect: [1, 1],
-          })
-        : await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ["images"],
-            quality: 0.9,
-            allowsEditing: true,
-            aspect: [1, 1],
-          });
+    const result = await launchPicker(source);
     if (result.canceled) return;
     const uri = result.assets[0].uri;
     setPhotoUri(uri);
-    runVision(uri);
-    runTrim(uri);
+    visionAttrsRef.current = null;
+    analyzePhoto(uri);
   }
 
-  async function runTrim(originalUri: string) {
-    if (!isBgRemovalAvailable()) return;
-    const reqId = ++trimReqRef.current;
-    setTrimming(true);
-    try {
-      const trimmed = await removeBackground(originalUri);
-      if (reqId !== trimReqRef.current) return;
-      setPhotoUri((current) => (current === originalUri ? trimmed.uri : current));
-    } catch {
-      // No subject detected or Vision failed — keep original.
-    } finally {
-      if (reqId === trimReqRef.current) setTrimming(false);
-    }
-  }
-
-  async function runVision(uri: string) {
-    const reqId = ++visionReqRef.current;
+  // Sequential pipeline: bg removal first (so colors are sampled from
+  // foreground pixels only via the Vision mask), then library-based
+  // extraction as fallback when bg removal isn't available or finds no
+  // subject. Running color extraction on the original photo would otherwise
+  // pick up the surface the garment is laid on.
+  async function analyzePhoto(originalUri: string) {
+    const reqId = ++analyzeReqRef.current;
     setAnalyzing(true);
     setAutoFilled(false);
+
+    let trimResult: BgRemoveResult | null = null;
+    if (isBgRemovalAvailable()) {
+      setTrimming(true);
+      try {
+        trimResult = await removeBackground(originalUri);
+        if (reqId !== analyzeReqRef.current) return;
+        const trimmedUri = trimResult.uri;
+        setPhotoUri((current) => {
+          if (current === originalUri) return trimmedUri;
+          return current;
+        });
+      } catch {
+        // No subject detected — fall through to library extraction.
+      } finally {
+        if (reqId === analyzeReqRef.current) setTrimming(false);
+      }
+    }
+
     try {
-      const attrs = await analyzeItemFromUri(uri);
-      if (reqId !== visionReqRef.current) return;
-      visionAttrsRef.current = attrs;
-      if (!colorsTouchedRef.current) {
-        const snapped = snapHexesToPresets(attrs.colors.map((c) => c.hex));
+      const visionAttrs: VisionAttrs = { colors: [] };
+
+      if (trimResult?.mask) {
+        const silhouette = inferSilhouetteFromMask(trimResult.mask);
+        if (silhouette) visionAttrs.silhouette = silhouette;
+      }
+
+      if (trimResult?.colors && trimResult.colors.length > 0) {
+        visionAttrs.colors = attrsFromMaskedColors(trimResult.colors).colors;
+      } else {
+        const attrs = await analyzeItemFromUri(originalUri);
+        if (reqId !== analyzeReqRef.current) return;
+        visionAttrs.colors = attrs.colors;
+      }
+
+      visionAttrsRef.current = visionAttrs;
+
+      if (!colorsTouchedRef.current && visionAttrs.colors.length > 0) {
+        const snapped = snapHexesToPresets(visionAttrs.colors.map((c) => c.hex));
         if (snapped.length > 0) {
           setPicks(snapped);
           setAutoFilled(true);
@@ -128,7 +179,7 @@ export default function NewItemScreen() {
     } catch {
       // Best-effort. Manual color picking still works.
     } finally {
-      if (reqId === visionReqRef.current) setAnalyzing(false);
+      if (reqId === analyzeReqRef.current) setAnalyzing(false);
     }
   }
 
@@ -159,7 +210,7 @@ export default function NewItemScreen() {
       await create.mutateAsync({
         photoUri,
         category,
-        name: name.trim() || null,
+        name: nameOrNull(name),
         styles: [...styles],
         seasons: [...seasons],
         pattern,
@@ -183,32 +234,49 @@ export default function NewItemScreen() {
     setter(next);
   }
 
+  const renderPhoto = () => (
+    <View className="rounded-xl overflow-hidden bg-line dark:bg-line-dark" style={{ aspectRatio: 1 }}>
+      <Image source={{ uri: photoUri! }} style={{ flex: 1 }} contentFit="cover" />
+      {trimming && (
+        <View className="absolute inset-0 items-center justify-center bg-black/30">
+          <ActivityIndicator color="#fff" />
+          <Text className="text-white mt-2">Removing background…</Text>
+        </View>
+      )}
+    </View>
+  );
+
+  const renderEmptyPhoto = () => (
+    <View
+      className="rounded-xl border-2 border-dashed border-line dark:border-line-dark items-center justify-center"
+      style={{ aspectRatio: 1 }}
+    >
+      <SymbolView name="camera" size={32} tintColor="#a8a29e" />
+      <Text variant="caption" className="mt-2">
+        Add a photo of the piece
+      </Text>
+    </View>
+  );
+
+  const colorsSubtitle = (): string => {
+    if (analyzing) return "Picking colors from the photo…";
+    if (autoFilled) return "Auto-picked — tap to adjust";
+    return "Tap up to 3 — first pick is the primary";
+  };
+
+  const colorsAccessory = (): React.ReactNode => {
+    if (analyzing) return <ActivityIndicator size="small" />;
+    if (autoFilled) return <SymbolView name="sparkles" size={16} tintColor="#a8a29e" />;
+    return null;
+  };
+
   return (
     <Screen edges={["bottom"]}>
       <ScrollView contentContainerStyle={{ padding: 20, gap: 24, paddingBottom: 60 }}>
         {/* Photo */}
         <View>
-          {photoUri ? (
-            <View className="rounded-xl overflow-hidden bg-line dark:bg-line-dark" style={{ aspectRatio: 1 }}>
-              <Image source={{ uri: photoUri }} style={{ flex: 1 }} contentFit="cover" />
-              {trimming && (
-                <View className="absolute inset-0 items-center justify-center bg-black/30">
-                  <ActivityIndicator color="#fff" />
-                  <Text className="text-white mt-2">Removing background…</Text>
-                </View>
-              )}
-            </View>
-          ) : (
-            <View
-              className="rounded-xl border-2 border-dashed border-line dark:border-line-dark items-center justify-center"
-              style={{ aspectRatio: 1 }}
-            >
-              <SymbolView name="camera" size={32} tintColor="#a8a29e" />
-              <Text variant="caption" className="mt-2">
-                Add a photo of the piece
-              </Text>
-            </View>
-          )}
+          {photoUri && renderPhoto()}
+          {!photoUri && renderEmptyPhoto()}
           <View className="flex-row gap-2 mt-3">
             <Button
               label="Camera"
@@ -228,20 +296,8 @@ export default function NewItemScreen() {
         {/* Colors */}
         <Section
           title="Colors"
-          subtitle={
-            analyzing
-              ? "Picking colors from the photo…"
-              : autoFilled
-                ? "Auto-picked — tap to adjust"
-                : "Tap up to 3 — first pick is the primary"
-          }
-          accessory={
-            analyzing ? (
-              <ActivityIndicator size="small" />
-            ) : autoFilled ? (
-              <SymbolView name="sparkles" size={16} tintColor="#a8a29e" />
-            ) : null
-          }
+          subtitle={colorsSubtitle()}
+          accessory={colorsAccessory()}
         >
           <View className="flex-row flex-wrap gap-3">
             {PRESET_PALETTE.map((s) => {
@@ -254,17 +310,12 @@ export default function NewItemScreen() {
                   className="items-center"
                 >
                   <View
-                    className={
-                      "w-12 h-12 rounded-full border-2 " +
-                      (selected
-                        ? "border-ink dark:border-ink-dark"
-                        : "border-line dark:border-line-dark")
-                    }
+                    className={`w-12 h-12 rounded-full border-2 ${swatchBorderClass(selected)}`}
                     style={{ backgroundColor: s.hex }}
                   />
                   {selected && (
                     <Text variant="caption" className="mt-1">
-                      {index === 0 ? "1st" : index === 1 ? "2nd" : "3rd"}
+                      {ordinalLabel(index)}
                     </Text>
                   )}
                 </Pressable>
@@ -379,6 +430,17 @@ export default function NewItemScreen() {
   );
 }
 
+const renderSubtitleSlot = (subtitle?: string): React.ReactNode => {
+  if (subtitle) {
+    return (
+      <Text variant="caption" className="mb-3">
+        {subtitle}
+      </Text>
+    );
+  }
+  return <View className="mb-2" />;
+};
+
 function Section({
   title,
   subtitle,
@@ -396,12 +458,7 @@ function Section({
         <Text variant="label">{title}</Text>
         {accessory}
       </View>
-      {subtitle && (
-        <Text variant="caption" className="mb-3">
-          {subtitle}
-        </Text>
-      )}
-      {!subtitle && <View className="mb-2" />}
+      {renderSubtitleSlot(subtitle)}
       {children}
     </View>
   );
