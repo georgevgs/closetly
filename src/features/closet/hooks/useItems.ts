@@ -1,6 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "~/lib/supabase";
-import type { Item, Category, Style, Season, Pattern, Formality, Warmth } from "~/types/items";
+import type {
+  Item,
+  Category,
+  Style,
+  Season,
+  Pattern,
+  Formality,
+  Warmth,
+  Silhouette,
+} from "~/types/items";
 import type { Json, TablesUpdate } from "~/types/database";
 import { itemFromRow, type ItemRow } from "../mapper";
 import { uploadItemImage } from "../upload";
@@ -64,13 +73,20 @@ export type UpdateItemInput = {
   pattern: Pattern;
   formality: Formality;
   warmth: Warmth;
+  silhouette?: Silhouette | null;
 };
 
 export function useUpdateItem() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...patch }: UpdateItemInput) => {
-      const { error } = await supabase.from("items").update(patch).eq("id", id);
+    mutationFn: async (input: UpdateItemInput) => {
+      const { id, silhouette, ...columns } = input;
+
+      if (silhouette !== undefined) {
+        await writeSilhouette(id, silhouette);
+      }
+
+      const { error } = await supabase.from("items").update(columns).eq("id", id);
       if (error) throw error;
     },
     onSuccess: (_, vars) => {
@@ -79,6 +95,35 @@ export function useUpdateItem() {
     },
   });
 }
+
+// vision_attrs is a non-strict jsonb blob (colors, silhouette, future fields).
+// We read-modify-write so a silhouette change doesn't clobber the stored colors.
+const writeSilhouette = async (
+  itemId: string,
+  silhouette: Silhouette | null,
+): Promise<void> => {
+  const { data: row, error: readError } = await supabase
+    .from("items")
+    .select("vision_attrs")
+    .eq("id", itemId)
+    .maybeSingle();
+  if (readError) throw readError;
+
+  const current = mergeableVisionAttrs(row?.vision_attrs);
+  const next = { ...current, silhouette };
+
+  const { error } = await supabase
+    .from("items")
+    .update({ vision_attrs: next as unknown as Json })
+    .eq("id", itemId);
+  if (error) throw error;
+};
+
+const mergeableVisionAttrs = (raw: unknown): Record<string, unknown> => {
+  if (!raw) return {};
+  if (typeof raw !== "object") return {};
+  return raw as Record<string, unknown>;
+};
 
 export function useReplaceItemPhoto() {
   const qc = useQueryClient();

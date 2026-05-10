@@ -150,6 +150,7 @@ export type Database = {
       }
       wear_log: {
         Row: {
+          affinity_delta: number | null
           created_at: string
           id: string
           outfit_id: string | null
@@ -158,6 +159,7 @@ export type Database = {
           worn_on: string
         }
         Insert: {
+          affinity_delta?: number | null
           created_at?: string
           id?: string
           outfit_id?: string | null

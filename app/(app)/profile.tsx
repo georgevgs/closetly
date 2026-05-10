@@ -7,6 +7,7 @@ import { useAuth } from "~/features/auth/context";
 import { supabase } from "~/lib/supabase";
 import { useThemePreference, type ThemePreference } from "~/providers/ThemeProvider";
 import { useCategoryPrefs } from "~/providers/CategoryPrefsProvider";
+import { WearHistorySection } from "~/features/wear/components/WearHistorySection";
 import { CATEGORIES } from "~/types/items";
 import { cn } from "~/lib/utils";
 
@@ -92,6 +93,8 @@ export default function ProfileScreen() {
               ))}
             </View>
           </View>
+
+          <WearHistorySection userId={session?.user.id} />
         </View>
         <View className="mt-auto pt-12">
           <Button

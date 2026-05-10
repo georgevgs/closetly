@@ -11,12 +11,21 @@ export type CombinatorOptions = {
   closet: Item[];
   weather?: WeatherContext;
   pairAffinity?: Map<string, number>;
+  recentlyWornItemIds?: Map<string, number>;
   limit?: number;
   includeOuterwear?: boolean;
 };
 
 export function suggestOutfits(opts: CombinatorOptions): OutfitSuggestion[] {
-  const { anchor, closet, weather, pairAffinity, limit = 10, includeOuterwear } = opts;
+  const {
+    anchor,
+    closet,
+    weather,
+    pairAffinity,
+    recentlyWornItemIds,
+    limit = 10,
+    includeOuterwear,
+  } = opts;
 
   const slots = pickSlots(anchor, includeOuterwear ?? shouldAddOuter(weather));
   const buckets = bucketByCategory(closet, anchor);
@@ -39,7 +48,7 @@ export function suggestOutfits(opts: CombinatorOptions): OutfitSuggestion[] {
 
   const scored = combos.map((items) => ({
     items,
-    score: scoreOutfit(items, { weather, pairAffinity }),
+    score: scoreOutfit(items, { weather, pairAffinity, recentlyWornItemIds }),
   }));
 
   return scored

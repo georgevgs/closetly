@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { View, ScrollView, TextInput, ActivityIndicator, Alert } from "react-native";
+import { View, ScrollView, TextInput, ActivityIndicator, Alert, Pressable } from "react-native";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, router } from "expo-router";
@@ -12,6 +12,7 @@ import { Button } from "~/components/ui/Button";
 import { Pill } from "~/components/ui/Pill";
 import { useItem, useUpdateItem, useReplaceItemPhoto } from "~/features/closet/hooks/useItems";
 import { signItemUrls } from "~/features/closet/mapper";
+import { seasonsForWarmth } from "~/lib/seasons";
 import { isBgRemovalAvailable, removeBackground } from "expo-bg-remover";
 import { useCategoryPrefs } from "~/providers/CategoryPrefsProvider";
 import {
@@ -24,7 +25,11 @@ import {
   type Pattern,
   type Formality,
   type Warmth,
+  type Silhouette,
 } from "~/types/items";
+
+type Fit = Silhouette["fit"];
+const FITS: Fit[] = ["slim", "regular", "relaxed", "oversized"];
 
 export default function EditItemScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -47,6 +52,7 @@ export default function EditItemScreen() {
   const [pattern, setPattern] = useState<Pattern>("solid");
   const [formality, setFormality] = useState<Formality>(3);
   const [warmth, setWarmth] = useState<Warmth>(2);
+  const [fit, setFit] = useState<Fit | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -58,6 +64,7 @@ export default function EditItemScreen() {
     setPattern(item.pattern);
     setFormality(item.formality);
     setWarmth(item.warmth);
+    setFit(initialFit(item.silhouette));
     setHydrated(true);
   }, [item, hydrated]);
 
@@ -135,6 +142,7 @@ export default function EditItemScreen() {
         pattern,
         formality,
         warmth,
+        silhouette: silhouetteFromFit(fit, item.silhouette),
       });
       toast.success("Saved");
       router.back();
@@ -143,6 +151,14 @@ export default function EditItemScreen() {
       Alert.alert("Could not save", err.message);
     }
   }
+
+  const handleFitTap = (option: Fit) => {
+    if (fit === option) {
+      setFit(null);
+      return;
+    }
+    setFit(option);
+  };
 
   const categoryOptions = visibleCategories.includes(category)
     ? visibleCategories
@@ -247,6 +263,15 @@ export default function EditItemScreen() {
               />
             ))}
           </View>
+          <Pressable
+            onPress={() => setSeasons(new Set(seasonsForWarmth(warmth)))}
+            hitSlop={8}
+            className="mt-2 self-start"
+          >
+            <Text variant="caption" className="underline">
+              Use warmth defaults ({warmthLabel(warmth)})
+            </Text>
+          </Pressable>
         </Section>
 
         <Section title="Formality" subtitle="1 = loungewear · 5 = black tie">
@@ -270,6 +295,19 @@ export default function EditItemScreen() {
                 label={String(n)}
                 selected={warmth === n}
                 onPress={() => setWarmth(n as Warmth)}
+              />
+            ))}
+          </View>
+        </Section>
+
+        <Section title="Fit" subtitle="How does it sit on the body? Tap again to clear.">
+          <View className="flex-row flex-wrap gap-2">
+            {FITS.map((option) => (
+              <Pill
+                key={option}
+                label={option}
+                selected={fit === option}
+                onPress={() => handleFitTap(option)}
               />
             ))}
           </View>
@@ -311,3 +349,26 @@ function Section({
     </View>
   );
 }
+
+const initialFit = (silhouette: Silhouette | null): Fit | null => {
+  if (!silhouette) return null;
+  return silhouette.fit;
+};
+
+// Preserve any non-fit silhouette fields (length, rise) the vision pass set.
+const silhouetteFromFit = (
+  fit: Fit | null,
+  current: Silhouette | null,
+): Silhouette | null => {
+  if (fit === null) return null;
+  if (!current) return { fit };
+  return { ...current, fit };
+};
+
+const warmthLabel = (warmth: Warmth): string => {
+  if (warmth === 0) return "bare";
+  if (warmth === 1) return "light";
+  if (warmth === 2) return "regular";
+  if (warmth === 3) return "warm";
+  return "parka";
+};

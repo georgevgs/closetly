@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   View,
   ScrollView,
@@ -24,6 +24,7 @@ import {
   type Swatch,
 } from "~/lib/color/extract";
 import { useCreateItem } from "~/features/closet/hooks/useCreateItem";
+import { seasonsForWarmth } from "~/lib/seasons";
 import {
   analyzeItemFromUri,
   attrsFromMaskedColors,
@@ -83,6 +84,8 @@ const launchPicker = (source: "camera" | "library") => {
   return ImagePicker.launchImageLibraryAsync(PICKER_OPTIONS);
 };
 
+const INITIAL_WARMTH: Warmth = 2;
+
 export default function NewItemScreen() {
   const create = useCreateItem();
   const { visible: visibleCategories } = useCategoryPrefs();
@@ -95,10 +98,18 @@ export default function NewItemScreen() {
   const [name, setName] = useState("");
   const [category, setCategory] = useState<Category>(initialCategory);
   const [styles, setStyles] = useState<Set<Style>>(new Set(["minimal"]));
-  const [seasons, setSeasons] = useState<Set<Season>>(new Set(SEASONS));
+  const [seasons, setSeasons] = useState<Set<Season>>(
+    new Set(seasonsForWarmth(INITIAL_WARMTH)),
+  );
+  const [seasonsTouched, setSeasonsTouched] = useState(false);
   const [pattern, setPattern] = useState<Pattern>("solid");
   const [formality, setFormality] = useState<Formality>(3);
-  const [warmth, setWarmth] = useState<Warmth>(2);
+  const [warmth, setWarmth] = useState<Warmth>(INITIAL_WARMTH);
+
+  useEffect(() => {
+    if (seasonsTouched) return;
+    setSeasons(new Set(seasonsForWarmth(warmth)));
+  }, [warmth, seasonsTouched]);
 
   const [analyzing, setAnalyzing] = useState(false);
   const [trimming, setTrimming] = useState(false);
@@ -378,14 +389,17 @@ export default function NewItemScreen() {
         </Section>
 
         {/* Seasons */}
-        <Section title="Seasons">
+        <Section title="Seasons" subtitle={seasonsSubtitle(seasonsTouched)}>
           <View className="flex-row flex-wrap gap-2">
-            {SEASONS.map((s) => (
+            {SEASONS.map((season) => (
               <Pill
-                key={s}
-                label={s}
-                selected={seasons.has(s)}
-                onPress={() => toggle(seasons, s, setSeasons)}
+                key={season}
+                label={season}
+                selected={seasons.has(season)}
+                onPress={() => {
+                  setSeasonsTouched(true);
+                  toggle(seasons, season, setSeasons);
+                }}
               />
             ))}
           </View>
@@ -429,6 +443,11 @@ export default function NewItemScreen() {
     </Screen>
   );
 }
+
+const seasonsSubtitle = (touched: boolean): string => {
+  if (touched) return "Pick all that apply";
+  return "Suggested from warmth — tap to adjust";
+};
 
 const renderSubtitleSlot = (subtitle?: string): React.ReactNode => {
   if (subtitle) {

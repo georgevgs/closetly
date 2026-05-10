@@ -2,6 +2,7 @@ import type { HSL } from "../color/hsl";
 import { paletteHarmony, pairHarmony, type PairScore } from "../color/harmony";
 import { STYLE_ADJACENCY } from "../../types/items";
 import type { Item, Style } from "../../types/items";
+import { RECENCY, recencyPenaltyForDaysAgo } from "../../features/outfits/tuning";
 
 export type ScoreBreakdown = {
   total: number;
@@ -9,8 +10,11 @@ export type ScoreBreakdown = {
   formality: number;
   style: number;
   pattern: number;
-  weather: number;
-  balance: number;
+  // null = no signal for this outfit (e.g. no weather data, or no silhouette
+  // fit on either upper or lower piece). The component is dropped from the
+  // weighted average instead of contributing a misleading "neutral" 75.
+  weather: number | null;
+  balance: number | null;
   notes: string[];
 };
 
@@ -26,71 +30,147 @@ const W_PATTERN = 0.1;
 const W_WEATHER = 0.1;
 const W_BALANCE = 0.1;
 
-export function scoreOutfit(
-  items: Item[],
-  opts: { weather?: WeatherContext; pairAffinity?: Map<string, number> } = {}
-): ScoreBreakdown {
-  if (items.length === 0) {
-    return {
-      total: 0,
-      color: 0,
-      formality: 0,
-      style: 0,
-      pattern: 0,
-      weather: 0,
-      balance: 0,
-      notes: [],
-    };
-  }
+export type ScoreOptions = {
+  weather?: WeatherContext;
+  pairAffinity?: Map<string, number>;
+  recentlyWornItemIds?: Map<string, number>;
+};
+
+export function scoreOutfit(items: Item[], opts: ScoreOptions = {}): ScoreBreakdown {
+  if (items.length === 0) return zeroBreakdown();
+
   const notes: string[] = [];
 
   const colorScore = scoreColor(items, notes);
   const formalityScore = scoreFormality(items, notes);
   const styleScore = scoreStyle(items, notes);
   const patternScore = scorePattern(items, notes);
-  let weatherScore = 75;
-  if (opts.weather) weatherScore = scoreWeather(items, opts.weather, notes);
+  const weatherScore = computeWeatherScore(items, opts.weather, notes);
   const balanceScore = scoreBalance(items, notes);
 
-  let total =
-    colorScore * W_COLOR +
-    formalityScore * W_FORMALITY +
-    styleScore * W_STYLE +
-    patternScore * W_PATTERN +
-    weatherScore * W_WEATHER +
-    balanceScore * W_BALANCE;
+  const components: WeightedComponent[] = [
+    { value: colorScore, weight: W_COLOR },
+    { value: formalityScore, weight: W_FORMALITY },
+    { value: styleScore, weight: W_STYLE },
+    { value: patternScore, weight: W_PATTERN },
+    { value: weatherScore, weight: W_WEATHER },
+    { value: balanceScore, weight: W_BALANCE },
+  ];
 
-  if (opts.pairAffinity && opts.pairAffinity.size > 0 && items.length >= 2) {
-    let bonus = 0;
-    let known = 0;
-    for (let i = 0; i < items.length; i++) {
-      for (let j = i + 1; j < items.length; j++) {
-        const k = pairKey(items[i].id, items[j].id);
-        const aff = opts.pairAffinity.get(k);
-        if (aff !== undefined) {
-          bonus += aff;
-          known++;
-        }
-      }
-    }
-    if (known > 0) {
-      const avg = bonus / known;
-      total += avg * 5;
-      if (avg > 0.3) notes.push("Boosted by your favorites");
-    }
-  }
+  let total = weightedAverage(components);
+  total += affinityBonus(items, opts.pairAffinity, notes);
+  total -= computeRecencyPenalty(items, opts.recentlyWornItemIds, notes);
 
   return {
-    total: Math.max(0, Math.min(100, Math.round(total))),
+    total: clampPercentage(Math.round(total)),
     color: Math.round(colorScore),
     formality: Math.round(formalityScore),
     style: Math.round(styleScore),
     pattern: Math.round(patternScore),
-    weather: Math.round(weatherScore),
-    balance: Math.round(balanceScore),
+    weather: roundOrNull(weatherScore),
+    balance: roundOrNull(balanceScore),
     notes,
   };
 }
+
+type WeightedComponent = { value: number | null; weight: number };
+
+const weightedAverage = (components: WeightedComponent[]): number => {
+  let weightedSum = 0;
+  let activeWeight = 0;
+  for (const component of components) {
+    if (component.value === null) continue;
+    weightedSum += component.value * component.weight;
+    activeWeight += component.weight;
+  }
+  if (activeWeight === 0) return 0;
+  return weightedSum / activeWeight;
+};
+
+const computeWeatherScore = (
+  items: Item[],
+  weather: WeatherContext | undefined,
+  notes: string[],
+): number | null => {
+  if (weather === undefined) return null;
+  return scoreWeather(items, weather, notes);
+};
+
+const affinityBonus = (
+  items: Item[],
+  pairAffinity: Map<string, number> | undefined,
+  notes: string[],
+): number => {
+  if (!pairAffinity) return 0;
+  if (pairAffinity.size === 0) return 0;
+  if (items.length < 2) return 0;
+
+  let totalAffinity = 0;
+  let knownPairs = 0;
+  items.forEach((firstItem, firstIndex) => {
+    const remaining = items.slice(firstIndex + 1);
+    for (const secondItem of remaining) {
+      const key = pairKey(firstItem.id, secondItem.id);
+      const affinity = pairAffinity.get(key);
+      if (affinity === undefined) continue;
+      totalAffinity += affinity;
+      knownPairs++;
+    }
+  });
+
+  if (knownPairs === 0) return 0;
+  const average = totalAffinity / knownPairs;
+  if (average > 0.3) notes.push("Boosted by your favorites");
+  return average * 5;
+};
+
+const computeRecencyPenalty = (
+  items: Item[],
+  recentlyWornItemIds: Map<string, number> | undefined,
+  notes: string[],
+): number => {
+  if (!recentlyWornItemIds) return 0;
+  if (recentlyWornItemIds.size === 0) return 0;
+
+  let totalPenalty = 0;
+  for (const item of items) {
+    const daysAgo = recentlyWornItemIds.get(item.id);
+    if (daysAgo === undefined) continue;
+    totalPenalty += recencyPenaltyForDaysAgo(daysAgo);
+  }
+  if (totalPenalty > RECENCY.maxOutfitPenalty) totalPenalty = RECENCY.maxOutfitPenalty;
+  if (totalPenalty > 0) notes.push(recencyNoteFor(totalPenalty));
+  return totalPenalty;
+};
+
+const recencyNoteFor = (penalty: number): string => {
+  if (penalty >= 15) return "You've worn most of this very recently";
+  return "Some pieces worn recently";
+};
+
+const zeroBreakdown = (): ScoreBreakdown => {
+  return {
+    total: 0,
+    color: 0,
+    formality: 0,
+    style: 0,
+    pattern: 0,
+    weather: null,
+    balance: null,
+    notes: [],
+  };
+};
+
+const roundOrNull = (value: number | null): number | null => {
+  if (value === null) return null;
+  return Math.round(value);
+};
+
+const clampPercentage = (value: number): number => {
+  if (value < 0) return 0;
+  if (value > 100) return 100;
+  return value;
+};
 
 function scoreColor(items: Item[], notes: string[]): number {
   const colorsByItem: HSL[][] = items.map((i) =>
@@ -208,31 +288,22 @@ function scoreWeather(items: Item[], w: WeatherContext, notes: string[]): number
   return Math.max(20, Math.min(100, score));
 }
 
-function scoreBalance(items: Item[], notes: string[]): number {
-  const top = items.find((i) => i.category === "top");
-  const bottom = items.find((i) => i.category === "bottom");
-  const dress = items.find((i) => i.category === "dress");
-  const outer = items.find((i) => i.category === "outerwear");
+function scoreBalance(items: Item[], notes: string[]): number | null {
+  const upper = pickUpperPiece(items);
+  const lower = pickLowerPiece(items);
+  if (!upper || !lower) return null;
 
-  // When outerwear is worn it dominates the visible top-half silhouette.
-  let upper = outer;
-  if (!upper) upper = top;
-  let lower = bottom;
-  if (!lower) lower = dress;
+  const upperVolume = volumeOf(upper);
+  const lowerVolume = volumeOf(lower);
+  if (upperVolume === null || lowerVolume === null) return null;
 
-  if (!upper || !lower) return 75;
-
-  const upperVol = volumeOf(upper);
-  const lowerVol = volumeOf(lower);
-  if (upperVol == null || lowerVol == null) return 75;
-
-  const diff = Math.abs(upperVol - lowerVol);
+  const diff = Math.abs(upperVolume - lowerVolume);
   if (diff === 0) {
-    if (upperVol >= 4) {
+    if (upperVolume >= 4) {
       notes.push("Both pieces oversized — silhouette feels shapeless");
       return 55;
     }
-    if (upperVol === 3) {
+    if (upperVolume === 3) {
       notes.push("Both pieces relaxed — risk of looking sloppy");
       return 72;
     }
@@ -246,6 +317,19 @@ function scoreBalance(items: Item[], notes: string[]): number {
   return 90;
 }
 
+// Outerwear dominates the visible top-half silhouette when worn.
+const pickUpperPiece = (items: Item[]): Item | undefined => {
+  const outer = items.find((item) => item.category === "outerwear");
+  if (outer) return outer;
+  return items.find((item) => item.category === "top");
+};
+
+const pickLowerPiece = (items: Item[]): Item | undefined => {
+  const bottom = items.find((item) => item.category === "bottom");
+  if (bottom) return bottom;
+  return items.find((item) => item.category === "dress");
+};
+
 const FIT_VOLUME: Record<NonNullable<Item["silhouette"]>["fit"], number> = {
   slim: 1,
   regular: 2,
@@ -253,19 +337,19 @@ const FIT_VOLUME: Record<NonNullable<Item["silhouette"]>["fit"], number> = {
   oversized: 4,
 };
 
-function volumeOf(item: Item): number | null {
+const volumeOf = (item: Item): number | null => {
   const fit = item.silhouette?.fit;
   if (!fit) return null;
   return FIT_VOLUME[fit];
-}
+};
 
-function warmthForTemp(t: number): number {
-  if (t >= 25) return 1;
-  if (t >= 18) return 2;
-  if (t >= 10) return 4;
-  if (t >= 2) return 6;
+const warmthForTemp = (tempC: number): number => {
+  if (tempC >= 25) return 1;
+  if (tempC >= 18) return 2;
+  if (tempC >= 10) return 4;
+  if (tempC >= 2) return 6;
   return 8;
-}
+};
 
 export function pairKey(a: string, b: string): string {
   if (a < b) return `${a}|${b}`;

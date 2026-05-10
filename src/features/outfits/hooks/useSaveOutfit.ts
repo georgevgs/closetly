@@ -1,6 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "~/lib/supabase";
+import { orNull } from "~/lib/utils";
 import type { Item } from "~/types/items";
+import { requireUserId } from "~/features/auth/requireUserId";
+import { bumpPairAffinity } from "../affinity";
+import { PAIR_AFFINITY, ratingToMultiplier } from "../tuning";
 
 export type SaveOutfitInput = {
   items: Item[];
@@ -9,78 +13,57 @@ export type SaveOutfitInput = {
   favorite?: boolean;
 };
 
-const PAIR_AFFINITY_BOOST = 1.0;
+const DEFAULT_RATING_FOR_AFFINITY = 4;
 
 export function useSaveOutfit() {
-  const qc = useQueryClient();
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: SaveOutfitInput) => {
-      const { data: userData } = await supabase.auth.getUser();
-      const userId = userData.user?.id;
-      if (!userId) throw new Error("Not authenticated");
+      const userId = await requireUserId();
 
-      const { data: outfit, error } = await supabase
-        .from("outfits")
-        .insert({
-          user_id: userId,
-          name: input.name ?? null,
-          rating: input.rating ?? null,
-          worn_count: 0,
-        })
-        .select()
-        .single();
-      if (error) throw error;
-
-      const links = input.items.map((it) => ({
-        outfit_id: outfit.id,
-        item_id: it.id,
-      }));
-      const { error: linkErr } = await supabase.from("outfit_items").insert(links);
-      if (linkErr) throw linkErr;
+      const outfit = await insertOutfit(userId, input);
+      await linkOutfitItems(outfit.id, input.items);
 
       if (input.favorite) {
         await supabase.from("favorites").insert({ user_id: userId, outfit_id: outfit.id });
       }
 
-      await bumpPairAffinity(userId, input.items, input.rating ?? 4);
+      const rating = ratingForAffinity(input.rating);
+      const delta = PAIR_AFFINITY.saveDelta * ratingToMultiplier(rating);
+      await bumpPairAffinity(userId, input.items.map((item) => item.id), delta);
 
       return outfit;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["outfits"] });
-      qc.invalidateQueries({ queryKey: ["favorites"] });
-      qc.invalidateQueries({ queryKey: ["pair-affinity"] });
+      queryClient.invalidateQueries({ queryKey: ["outfits"] });
+      queryClient.invalidateQueries({ queryKey: ["favorites"] });
+      queryClient.invalidateQueries({ queryKey: ["pair-affinity"] });
     },
   });
 }
 
-async function bumpPairAffinity(userId: string, items: Item[], rating: number) {
-  const ratingDelta = (rating - 3) / 2; // -1..+1
-  const delta = PAIR_AFFINITY_BOOST * ratingDelta;
-  if (delta === 0) return;
+const insertOutfit = async (userId: string, input: SaveOutfitInput) => {
+  const { data, error } = await supabase
+    .from("outfits")
+    .insert({
+      user_id: userId,
+      name: orNull(input.name),
+      rating: orNull(input.rating),
+      worn_count: 0,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+};
 
-  const rows: { user_id: string; item_a: string; item_b: string; affinity: number }[] = [];
-  for (let i = 0; i < items.length; i++) {
-    for (let j = i + 1; j < items.length; j++) {
-      const [a, b] =
-        items[i].id < items[j].id ? [items[i].id, items[j].id] : [items[j].id, items[i].id];
-      rows.push({ user_id: userId, item_a: a, item_b: b, affinity: delta });
-    }
-  }
+const linkOutfitItems = async (outfitId: string, items: Item[]): Promise<void> => {
+  const links = items.map((item) => ({ outfit_id: outfitId, item_id: item.id }));
+  const { error } = await supabase.from("outfit_items").insert(links);
+  if (error) throw error;
+};
 
-  for (const row of rows) {
-    const { data: existing } = await supabase
-      .from("item_pair_affinity")
-      .select("affinity")
-      .eq("user_id", row.user_id)
-      .eq("item_a", row.item_a)
-      .eq("item_b", row.item_b)
-      .maybeSingle();
-    const next = (existing?.affinity ?? 0) + row.affinity;
-    await supabase.from("item_pair_affinity").upsert({ ...row, affinity: clamp(next, -2, 2) });
-  }
-}
-
-function clamp(v: number, lo: number, hi: number): number {
-  return Math.max(lo, Math.min(hi, v));
-}
+const ratingForAffinity = (rating: number | undefined): number => {
+  if (rating === undefined) return DEFAULT_RATING_FOR_AFFINITY;
+  return rating;
+};
