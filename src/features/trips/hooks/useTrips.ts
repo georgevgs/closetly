@@ -3,7 +3,8 @@ import { supabase } from "~/lib/supabase";
 import { handleError } from "~/lib/handleError";
 import { requireUserId } from "~/features/auth/requireUserId";
 import { toDateString } from "~/lib/dates";
-import type { Item } from "~/types/items";
+import type { Item, Season } from "~/types/items";
+import { tripKeys } from "./useTrip";
 
 export type SavedTrip = {
   id: string;
@@ -12,18 +13,16 @@ export type SavedTrip = {
   endDate: string;
   expectedTempMin: number | null;
   expectedTempMax: number | null;
+  destination: string | null;
+  notes: string | null;
+  seasons: Season[];
   itemIds: string[];
   createdAt: string;
 };
 
-const tripsKeys = {
-  all: ["trips"] as const,
-  list: (userId: string) => ["trips", "list", userId] as const,
-};
-
 export const useTrips = (userId: string | undefined) => {
   return useQuery({
-    queryKey: userId ? tripsKeys.list(userId) : ["trips", "noop"],
+    queryKey: userId ? tripKeys.list(userId) : ["trips", "noop"],
     enabled: Boolean(userId),
     queryFn: async (): Promise<SavedTrip[]> => {
       const trips = await fetchTrips(userId!);
@@ -41,6 +40,9 @@ export type CreateTripInput = {
   endDate: Date;
   expectedTempMin: number;
   expectedTempMax: number;
+  destination: string | null;
+  notes: string | null;
+  seasons: Season[];
   items: Item[];
 };
 
@@ -51,22 +53,53 @@ export const useCreateTrip = () => {
       const userId = await requireUserId();
       const trip = await insertTrip(userId, input);
       await linkTripItems(trip.id, input.items);
-      return {
-        id: trip.id,
-        name: trip.name,
-        startDate: trip.start_date,
-        endDate: trip.end_date,
-        expectedTempMin: trip.expected_temp_min,
-        expectedTempMax: trip.expected_temp_max,
-        itemIds: input.items.map((item) => item.id),
-        createdAt: trip.created_at,
-      };
+      return tripRowToSaved(trip, input.items.map((item) => item.id));
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: tripsKeys.all });
+      queryClient.invalidateQueries({ queryKey: tripKeys.all });
     },
     onError: (error) =>
       handleError(error, { fallbackMessage: "Couldn't save this trip." }),
+  });
+};
+
+export type UpdateTripInput = {
+  id: string;
+  name: string;
+  startDate: Date;
+  endDate: Date;
+  expectedTempMin: number;
+  expectedTempMax: number;
+  destination: string | null;
+  notes: string | null;
+  seasons: Season[];
+};
+
+export const useUpdateTrip = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: UpdateTripInput): Promise<void> => {
+      const { error } = await supabase
+        .from("trips")
+        .update({
+          name: input.name,
+          start_date: toDateString(input.startDate),
+          end_date: toDateString(input.endDate),
+          expected_temp_min: input.expectedTempMin,
+          expected_temp_max: input.expectedTempMax,
+          destination: input.destination,
+          notes: input.notes,
+          seasons: input.seasons,
+        })
+        .eq("id", input.id);
+      if (error) throw error;
+    },
+    onSuccess: (_data, input) => {
+      queryClient.invalidateQueries({ queryKey: tripKeys.all });
+      queryClient.invalidateQueries({ queryKey: tripKeys.detail(input.id) });
+    },
+    onError: (error) =>
+      handleError(error, { fallbackMessage: "Couldn't update this trip." }),
   });
 };
 
@@ -78,7 +111,7 @@ export const useDeleteTrip = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: tripsKeys.all });
+      queryClient.invalidateQueries({ queryKey: tripKeys.all });
     },
     onError: (error) =>
       handleError(error, { fallbackMessage: "Couldn't delete this trip." }),
@@ -92,15 +125,20 @@ type TripRow = {
   end_date: string;
   expected_temp_min: number | null;
   expected_temp_max: number | null;
+  destination: string | null;
+  notes: string | null;
+  seasons: Season[];
   created_at: string;
 };
 
 type TripItemRow = { trip_id: string; item_id: string };
 
+const TRIP_SELECT = "id, name, start_date, end_date, expected_temp_min, expected_temp_max, destination, notes, seasons, created_at";
+
 const fetchTrips = async (userId: string): Promise<TripRow[]> => {
   const { data, error } = await supabase
     .from("trips")
-    .select("id, name, start_date, end_date, expected_temp_min, expected_temp_max, created_at")
+    .select(TRIP_SELECT)
     .eq("user_id", userId)
     .order("start_date", { ascending: false });
   if (error) throw error;
@@ -143,6 +181,10 @@ const buildSavedTrip = (
   itemsByTrip: Map<string, string[]>,
 ): SavedTrip => {
   const itemIds = itemsByTrip.get(trip.id);
+  return tripRowToSaved(trip, itemIds === undefined ? [] : itemIds);
+};
+
+const tripRowToSaved = (trip: TripRow, itemIds: string[]): SavedTrip => {
   return {
     id: trip.id,
     name: trip.name,
@@ -150,7 +192,10 @@ const buildSavedTrip = (
     endDate: trip.end_date,
     expectedTempMin: trip.expected_temp_min,
     expectedTempMax: trip.expected_temp_max,
-    itemIds: itemIds === undefined ? [] : itemIds,
+    destination: trip.destination,
+    notes: trip.notes,
+    seasons: trip.seasons,
+    itemIds,
     createdAt: trip.created_at,
   };
 };
@@ -168,8 +213,11 @@ const insertTrip = async (
       end_date: toDateString(input.endDate),
       expected_temp_min: input.expectedTempMin,
       expected_temp_max: input.expectedTempMax,
+      destination: input.destination,
+      notes: input.notes,
+      seasons: input.seasons,
     })
-    .select("id, name, start_date, end_date, expected_temp_min, expected_temp_max, created_at")
+    .select(TRIP_SELECT)
     .single();
   if (error) throw error;
   return data;

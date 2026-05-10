@@ -1,4 +1,5 @@
 import { Alert, Pressable, View } from "react-native";
+import { router } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { Text } from "~/components/ui/Text";
 import { useTrips, useDeleteTrip, type SavedTrip } from "~/features/trips/hooks/useTrips";
@@ -32,6 +33,7 @@ export function SavedTripsSection({ userId }: { userId: string | undefined }) {
           <SavedTripRow
             key={trip.id}
             trip={trip}
+            onOpen={() => openTrip(trip.id)}
             onDelete={() => confirmDelete(trip)}
           />
         ))}
@@ -42,13 +44,20 @@ export function SavedTripsSection({ userId }: { userId: string | undefined }) {
 
 function SavedTripRow({
   trip,
+  onOpen,
   onDelete,
 }: {
   trip: SavedTrip;
+  onOpen: () => void;
   onDelete: () => void;
 }) {
   return (
-    <View className="flex-row items-center rounded-lg border border-line dark:border-line-dark p-3">
+    <Pressable
+      onPress={onOpen}
+      accessibilityRole="button"
+      accessibilityLabel={`Open trip ${trip.name}`}
+      className="flex-row items-center rounded-lg border border-line dark:border-line-dark p-3"
+    >
       <View className="flex-1">
         <Text variant="body" numberOfLines={1}>
           {trip.name}
@@ -60,9 +69,14 @@ function SavedTripRow({
       <Pressable onPress={onDelete} hitSlop={12} className="px-2">
         <SymbolView name="trash" size={18} tintColor="#a85a3b" />
       </Pressable>
-    </View>
+      <SymbolView name="chevron.right" size={14} tintColor="#a8a29e" />
+    </Pressable>
   );
 }
+
+const openTrip = (tripId: string): void => {
+  router.push({ pathname: "/trips/[id]", params: { id: tripId } });
+};
 
 const tripSummary = (trip: SavedTrip): string => {
   const range = formatRange(trip.startDate, trip.endDate);

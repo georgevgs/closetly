@@ -73,6 +73,14 @@ function AuthGate() {
         options={{ presentation: "modal", headerShown: true, title: "Build outfit" }}
       />
       <Stack.Screen
+        name="trips/[id]"
+        options={{ headerShown: true, headerBackTitle: "Trips", title: "Trip" }}
+      />
+      <Stack.Screen
+        name="trips/edit/[id]"
+        options={{ presentation: "modal", headerShown: true, title: "Edit trip" }}
+      />
+      <Stack.Screen
         name="legal/privacy"
         options={{ presentation: "modal", headerShown: true, title: "Privacy Policy" }}
       />

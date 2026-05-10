@@ -6,15 +6,17 @@ import { Screen } from "~/components/ui/Screen";
 import { Text } from "~/components/ui/Text";
 import { Pill } from "~/components/ui/Pill";
 import { Button } from "~/components/ui/Button";
+import { DateField } from "~/components/ui/DateField";
 import { ItemCard } from "~/features/closet/components/ItemCard";
 import { useAuth } from "~/features/auth/context";
 import { useSignedItems } from "~/features/closet/hooks/useSignedItems";
 import { buildCapsule, type Capsule } from "~/features/trips/capsule";
 import { useCreateTrip } from "~/features/trips/hooks/useTrips";
 import { SavedTripsSection } from "~/features/trips/components/SavedTripsSection";
+import { calendarDaysBetween } from "~/lib/dates";
 import { SEASONS, type Season } from "~/types/items";
 
-const DEFAULT_DAYS = "5";
+const DEFAULT_TRIP_LENGTH_DAYS = 5;
 const DEFAULT_TEMP_MIN = "12";
 const DEFAULT_TEMP_MAX = "22";
 
@@ -23,8 +25,17 @@ export default function TripsScreen() {
   const { data: items } = useSignedItems(session?.user.id);
   const createTrip = useCreateTrip();
 
+  const initialStart = useMemo(() => atMidnight(new Date()), []);
+  const initialEnd = useMemo(
+    () => addDays(initialStart, DEFAULT_TRIP_LENGTH_DAYS - 1),
+    [initialStart],
+  );
+
   const [name, setName] = useState("");
-  const [days, setDays] = useState(DEFAULT_DAYS);
+  const [destination, setDestination] = useState("");
+  const [notes, setNotes] = useState("");
+  const [startDate, setStartDate] = useState<Date>(initialStart);
+  const [endDate, setEndDate] = useState<Date>(initialEnd);
   const [tempMin, setTempMin] = useState(DEFAULT_TEMP_MIN);
   const [tempMax, setTempMax] = useState(DEFAULT_TEMP_MAX);
   const [seasons, setSeasons] = useState<Set<Season>>(
@@ -32,7 +43,7 @@ export default function TripsScreen() {
   );
   const [generated, setGenerated] = useState(false);
 
-  const numericDays = parseInputNumber(days, 1);
+  const numericDays = inclusiveDaysBetween(startDate, endDate);
   const numericTempMin = parseInputNumber(tempMin, 0);
   const numericTempMax = parseInputNumber(tempMax, 25);
 
@@ -46,6 +57,19 @@ export default function TripsScreen() {
       seasons: [...seasons],
     });
   }, [items, generated, numericDays, numericTempMin, numericTempMax, seasons]);
+
+  const updateStartDate = (next: Date) => {
+    setStartDate(next);
+    if (endDate < next) setEndDate(next);
+  };
+
+  const updateEndDate = (next: Date) => {
+    if (next < startDate) {
+      setEndDate(startDate);
+      return;
+    }
+    setEndDate(next);
+  };
 
   const toggleSeason = (season: Season) => {
     const next = new Set(seasons);
@@ -65,8 +89,6 @@ export default function TripsScreen() {
       toast.error("Give your trip a name to save it.");
       return;
     }
-    const startDate = new Date();
-    const endDate = addDays(startDate, Math.max(0, numericDays - 1));
     createTrip.mutate(
       {
         name: tripName,
@@ -74,12 +96,17 @@ export default function TripsScreen() {
         endDate,
         expectedTempMin: numericTempMin,
         expectedTempMax: numericTempMax,
+        destination: trimmedOrNull(destination),
+        notes: trimmedOrNull(notes),
+        seasons: [...seasons],
         items: capsule.items,
       },
       {
         onSuccess: () => {
           toast.success("Trip saved");
           setName("");
+          setDestination("");
+          setNotes("");
           setGenerated(false);
         },
       },
@@ -101,8 +128,15 @@ export default function TripsScreen() {
         <PlannerForm
           name={name}
           onChangeName={setName}
-          days={days}
-          onChangeDays={setDays}
+          destination={destination}
+          onChangeDestination={setDestination}
+          notes={notes}
+          onChangeNotes={setNotes}
+          startDate={startDate}
+          endDate={endDate}
+          onChangeStartDate={updateStartDate}
+          onChangeEndDate={updateEndDate}
+          numericDays={numericDays}
           tempMin={tempMin}
           onChangeTempMin={setTempMin}
           tempMax={tempMax}
@@ -127,8 +161,15 @@ export default function TripsScreen() {
 function PlannerForm({
   name,
   onChangeName,
-  days,
-  onChangeDays,
+  destination,
+  onChangeDestination,
+  notes,
+  onChangeNotes,
+  startDate,
+  endDate,
+  onChangeStartDate,
+  onChangeEndDate,
+  numericDays,
   tempMin,
   onChangeTempMin,
   tempMax,
@@ -139,8 +180,15 @@ function PlannerForm({
 }: {
   name: string;
   onChangeName: (value: string) => void;
-  days: string;
-  onChangeDays: (value: string) => void;
+  destination: string;
+  onChangeDestination: (value: string) => void;
+  notes: string;
+  onChangeNotes: (value: string) => void;
+  startDate: Date;
+  endDate: Date;
+  onChangeStartDate: (next: Date) => void;
+  onChangeEndDate: (next: Date) => void;
+  numericDays: number;
   tempMin: string;
   onChangeTempMin: (value: string) => void;
   tempMax: string;
@@ -164,8 +212,31 @@ function PlannerForm({
         />
       </View>
 
+      <View>
+        <Text variant="label" className="mb-1">
+          Destination (optional)
+        </Text>
+        <TextInput
+          value={destination}
+          onChangeText={onChangeDestination}
+          placeholder="e.g. Lisbon, Portugal"
+          placeholderTextColor="#a8a29e"
+          className="h-12 px-4 rounded-lg border border-line dark:border-line-dark text-ink dark:text-ink-dark"
+        />
+      </View>
+
       <View className="flex-row gap-3">
-        <NumberField label="Days" value={days} onChange={onChangeDays} />
+        <DateField label="Start" value={startDate} onChange={onChangeStartDate} />
+        <DateField
+          label="End"
+          value={endDate}
+          onChange={onChangeEndDate}
+          minimumDate={startDate}
+        />
+      </View>
+      <Text variant="caption">{tripDurationLabel(numericDays)}</Text>
+
+      <View className="flex-row gap-3">
         <NumberField label="Min °C" value={tempMin} onChange={onChangeTempMin} />
         <NumberField label="Max °C" value={tempMax} onChange={onChangeTempMax} />
       </View>
@@ -184,6 +255,23 @@ function PlannerForm({
             />
           ))}
         </View>
+      </View>
+
+      <View>
+        <Text variant="label" className="mb-1">
+          Notes (optional)
+        </Text>
+        <TextInput
+          value={notes}
+          onChangeText={onChangeNotes}
+          placeholder="Anything to remember while packing"
+          placeholderTextColor="#a8a29e"
+          multiline
+          numberOfLines={3}
+          textAlignVertical="top"
+          className="px-4 py-3 rounded-lg border border-line dark:border-line-dark text-ink dark:text-ink-dark"
+          style={{ minHeight: 80 }}
+        />
       </View>
 
       <Button label="Build capsule" onPress={onBuild} />
@@ -281,8 +369,32 @@ const parseInputNumber = (raw: string, fallback: number): number => {
   return parsed;
 };
 
+const trimmedOrNull = (raw: string): string | null => {
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return null;
+  return trimmed;
+};
+
+const atMidnight = (date: Date): Date => {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  return next;
+};
+
 const addDays = (date: Date, days: number): Date => {
   const next = new Date(date);
   next.setDate(next.getDate() + days);
   return next;
+};
+
+// Inclusive — a trip starting and ending on the same day is one day.
+const inclusiveDaysBetween = (start: Date, end: Date): number => {
+  const diff = calendarDaysBetween(start, end);
+  if (diff < 0) return 1;
+  return diff + 1;
+};
+
+const tripDurationLabel = (days: number): string => {
+  if (days === 1) return "1 day";
+  return `${days} days`;
 };

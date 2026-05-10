@@ -140,6 +140,7 @@ export type Database = {
           id: string
           name: string
           notes: string | null
+          seasons: Database["public"]["Enums"]["season_tag"][]
           start_date: string
           user_id: string
         }
@@ -152,6 +153,7 @@ export type Database = {
           id?: string
           name: string
           notes?: string | null
+          seasons?: Database["public"]["Enums"]["season_tag"][]
           start_date: string
           user_id: string
         }
