@@ -7,7 +7,6 @@ import type { BottomSheetModal } from "@gorhom/bottom-sheet";
 import { Screen } from "~/components/ui/Screen";
 import { Text } from "~/components/ui/Text";
 import { Pill } from "~/components/ui/Pill";
-import { Button } from "~/components/ui/Button";
 import { useAuth } from "~/features/auth/context";
 import { useSignedItems } from "~/features/closet/hooks/useSignedItems";
 import { usePairAffinity } from "~/features/outfits/hooks/usePairAffinity";
@@ -18,6 +17,7 @@ import { useLogWear } from "~/features/wear/hooks/useLogWear";
 import { useOutfitBuilder } from "~/features/outfits/hooks/useOutfitBuilder";
 import { SlotTile } from "~/features/outfits/components/SlotTile";
 import { SlotPickerSheet } from "~/features/outfits/components/SlotPickerSheet";
+import { OutfitActionBar } from "~/features/outfits/components/OutfitActionBar";
 import { toWeatherContext } from "~/features/outfits/weatherContext";
 import { scoreOutfit, type ScoreBreakdown } from "~/lib/outfit/score";
 import type { Category, Item } from "~/types/items";
@@ -83,7 +83,6 @@ export default function BuildOutfitScreen() {
   }, [builder.selectedItems, weather, pairAffinity, recentlyWornItemIds]);
 
   const onSave = () => {
-    if (!ensureMinimumItems(builder.selectedItems)) return;
     save.mutate(
       {
         items: builder.selectedItems,
@@ -101,7 +100,6 @@ export default function BuildOutfitScreen() {
   };
 
   const onWear = () => {
-    if (!ensureMinimumItems(builder.selectedItems)) return;
     wear.mutate(
       { items: builder.selectedItems, weather },
       {
@@ -115,7 +113,7 @@ export default function BuildOutfitScreen() {
 
   return (
     <Screen edges={["bottom"]}>
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60, gap: 20 }}>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 20 }}>
         <NameField value={name} onChange={setName} />
         <ScoreBlock score={score} itemCount={builder.selectedItems.length} />
         <SlotGrid
@@ -126,14 +124,15 @@ export default function BuildOutfitScreen() {
         {addableSlots.length > 0 && (
           <AddSlotRow addable={addableSlots} onAdd={addSlot} />
         )}
-        <ActionBar
-          canAct={builder.selectedItems.length >= 2}
-          saving={save.isPending}
-          wearing={wear.isPending}
-          onSave={onSave}
-          onWear={onWear}
-        />
       </ScrollView>
+
+      <OutfitActionBar
+        itemCount={builder.selectedItems.length}
+        saving={save.isPending}
+        wearing={wear.isPending}
+        onSave={onSave}
+        onWear={onWear}
+      />
 
       <SlotPickerSheet
         ref={pickerRef}
@@ -296,46 +295,6 @@ function AddSlotRow({
     </View>
   );
 }
-
-function ActionBar({
-  canAct,
-  saving,
-  wearing,
-  onSave,
-  onWear,
-}: {
-  canAct: boolean;
-  saving: boolean;
-  wearing: boolean;
-  onSave: () => void;
-  onWear: () => void;
-}) {
-  return (
-    <View className="flex-row gap-2 mt-4">
-      <Button
-        label="Save"
-        variant="secondary"
-        className="flex-1"
-        onPress={onSave}
-        loading={saving}
-        disabled={!canAct || wearing}
-      />
-      <Button
-        label="Wear today"
-        className="flex-1"
-        onPress={onWear}
-        loading={wearing}
-        disabled={!canAct || saving}
-      />
-    </View>
-  );
-}
-
-const ensureMinimumItems = (items: Item[]): boolean => {
-  if (items.length >= 2) return true;
-  toast.error("Pick at least two pieces.");
-  return false;
-};
 
 const trimmedNameOrUndefined = (raw: string): string | undefined => {
   const trimmed = raw.trim();

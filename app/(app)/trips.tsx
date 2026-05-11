@@ -1,24 +1,25 @@
 import { useMemo, useState } from "react";
-import { View, ScrollView, TextInput } from "react-native";
+import { View, ScrollView } from "react-native";
 import { toast } from "sonner-native";
 
 import { Screen } from "~/components/ui/Screen";
 import { Text } from "~/components/ui/Text";
-import { Pill } from "~/components/ui/Pill";
-import { Button } from "~/components/ui/Button";
-import { DateField } from "~/components/ui/DateField";
-import { ItemCard } from "~/features/closet/components/ItemCard";
 import { useAuth } from "~/features/auth/context";
 import { useSignedItems } from "~/features/closet/hooks/useSignedItems";
-import { buildCapsule, type Capsule } from "~/features/trips/capsule";
+import { buildCapsule } from "~/features/trips/capsule";
 import { useCreateTrip } from "~/features/trips/hooks/useTrips";
 import { SavedTripsSection } from "~/features/trips/components/SavedTripsSection";
+import { TripPlannerForm } from "~/features/trips/components/TripPlannerForm";
+import { CapsulePreview } from "~/features/trips/components/CapsulePreview";
+import { SaveTripBar } from "~/features/trips/components/SaveTripBar";
+import { useDebouncedValue } from "~/hooks/useDebouncedValue";
 import { calendarDaysBetween } from "~/lib/dates";
-import { SEASONS, type Season } from "~/types/items";
+import { type Season } from "~/types/items";
 
 const DEFAULT_TRIP_LENGTH_DAYS = 5;
 const DEFAULT_TEMP_MIN = "12";
 const DEFAULT_TEMP_MAX = "22";
+const TEMP_DEBOUNCE_MS = 150;
 
 export default function TripsScreen() {
   const { session } = useAuth();
@@ -41,14 +42,16 @@ export default function TripsScreen() {
   const [seasons, setSeasons] = useState<Set<Season>>(
     new Set(["spring", "autumn"]),
   );
-  const [generated, setGenerated] = useState(false);
+
+  const debouncedTempMin = useDebouncedValue(tempMin, TEMP_DEBOUNCE_MS);
+  const debouncedTempMax = useDebouncedValue(tempMax, TEMP_DEBOUNCE_MS);
 
   const numericDays = inclusiveDaysBetween(startDate, endDate);
-  const numericTempMin = parseInputNumber(tempMin, 0);
-  const numericTempMax = parseInputNumber(tempMax, 25);
+  const numericTempMin = parseInputNumber(debouncedTempMin, 0);
+  const numericTempMax = parseInputNumber(debouncedTempMax, 25);
 
   const capsule = useMemo(() => {
-    if (!items || !generated) return null;
+    if (!items) return null;
     return buildCapsule({
       closet: items,
       days: numericDays,
@@ -56,7 +59,7 @@ export default function TripsScreen() {
       tempMaxC: numericTempMax,
       seasons: [...seasons],
     });
-  }, [items, generated, numericDays, numericTempMin, numericTempMax, seasons]);
+  }, [items, numericDays, numericTempMin, numericTempMax, seasons]);
 
   const updateStartDate = (next: Date) => {
     setStartDate(next);
@@ -72,26 +75,22 @@ export default function TripsScreen() {
   };
 
   const toggleSeason = (season: Season) => {
-    const next = new Set(seasons);
-    if (next.has(season)) next.delete(season);
-    else next.add(season);
-    setSeasons(next);
+    const nextSeasons = new Set(seasons);
+    if (nextSeasons.has(season)) nextSeasons.delete(season);
+    else nextSeasons.add(season);
+    setSeasons(nextSeasons);
   };
+
+  const trimmedName = name.trim();
+  const itemCount = capsule ? capsule.itemCount : 0;
+  const saveBlockedReason = blockedReason({ trimmedName, itemCount });
 
   const saveTrip = () => {
     if (!capsule) return;
-    if (capsule.items.length === 0) {
-      toast.error("Capsule is empty — adjust the filters.");
-      return;
-    }
-    const tripName = name.trim();
-    if (tripName.length === 0) {
-      toast.error("Give your trip a name to save it.");
-      return;
-    }
+    if (saveBlockedReason !== null) return;
     createTrip.mutate(
       {
-        name: tripName,
+        name: trimmedName,
         startDate,
         endDate,
         expectedTempMin: numericTempMin,
@@ -107,15 +106,17 @@ export default function TripsScreen() {
           setName("");
           setDestination("");
           setNotes("");
-          setGenerated(false);
         },
       },
     );
   };
 
   return (
-    <Screen>
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 60 }}>
+    <Screen edges={["top", "left", "right"]}>
+      <ScrollView
+        contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 32 }}
+        keyboardShouldPersistTaps="handled"
+      >
         <View className="pt-4">
           <Text variant="display">Trips</Text>
           <Text variant="caption" className="mt-1">
@@ -125,7 +126,7 @@ export default function TripsScreen() {
 
         <SavedTripsSection userId={session?.user.id} />
 
-        <PlannerForm
+        <TripPlannerForm
           name={name}
           onChangeName={setName}
           destination={destination}
@@ -143,225 +144,33 @@ export default function TripsScreen() {
           onChangeTempMax={setTempMax}
           seasons={seasons}
           onToggleSeason={toggleSeason}
-          onBuild={() => setGenerated(true)}
         />
 
-        {capsule && (
-          <CapsulePreview
-            capsule={capsule}
-            saving={createTrip.isPending}
-            onSave={saveTrip}
-          />
-        )}
+        {capsule && <CapsulePreview capsule={capsule} />}
       </ScrollView>
+
+      <SaveTripBar
+        onSave={saveTrip}
+        saving={createTrip.isPending}
+        disabled={saveBlockedReason !== null}
+        hint={saveBlockedReason}
+        itemCount={itemCount}
+      />
     </Screen>
   );
 }
 
-function PlannerForm({
-  name,
-  onChangeName,
-  destination,
-  onChangeDestination,
-  notes,
-  onChangeNotes,
-  startDate,
-  endDate,
-  onChangeStartDate,
-  onChangeEndDate,
-  numericDays,
-  tempMin,
-  onChangeTempMin,
-  tempMax,
-  onChangeTempMax,
-  seasons,
-  onToggleSeason,
-  onBuild,
+const blockedReason = ({
+  trimmedName,
+  itemCount,
 }: {
-  name: string;
-  onChangeName: (value: string) => void;
-  destination: string;
-  onChangeDestination: (value: string) => void;
-  notes: string;
-  onChangeNotes: (value: string) => void;
-  startDate: Date;
-  endDate: Date;
-  onChangeStartDate: (next: Date) => void;
-  onChangeEndDate: (next: Date) => void;
-  numericDays: number;
-  tempMin: string;
-  onChangeTempMin: (value: string) => void;
-  tempMax: string;
-  onChangeTempMax: (value: string) => void;
-  seasons: Set<Season>;
-  onToggleSeason: (season: Season) => void;
-  onBuild: () => void;
-}) {
-  return (
-    <View className="mt-8 gap-4">
-      <View>
-        <Text variant="label" className="mb-1">
-          Trip name
-        </Text>
-        <TextInput
-          value={name}
-          onChangeText={onChangeName}
-          placeholder="e.g. Lisbon weekend"
-          placeholderTextColor="#a8a29e"
-          className="h-12 px-4 rounded-lg border border-line dark:border-line-dark text-ink dark:text-ink-dark"
-        />
-      </View>
-
-      <View>
-        <Text variant="label" className="mb-1">
-          Destination (optional)
-        </Text>
-        <TextInput
-          value={destination}
-          onChangeText={onChangeDestination}
-          placeholder="e.g. Lisbon, Portugal"
-          placeholderTextColor="#a8a29e"
-          className="h-12 px-4 rounded-lg border border-line dark:border-line-dark text-ink dark:text-ink-dark"
-        />
-      </View>
-
-      <View className="flex-row gap-3">
-        <DateField label="Start" value={startDate} onChange={onChangeStartDate} />
-        <DateField
-          label="End"
-          value={endDate}
-          onChange={onChangeEndDate}
-          minimumDate={startDate}
-        />
-      </View>
-      <Text variant="caption">{tripDurationLabel(numericDays)}</Text>
-
-      <View className="flex-row gap-3">
-        <NumberField label="Min °C" value={tempMin} onChange={onChangeTempMin} />
-        <NumberField label="Max °C" value={tempMax} onChange={onChangeTempMax} />
-      </View>
-
-      <View>
-        <Text variant="label" className="mb-2">
-          Seasons
-        </Text>
-        <View className="flex-row gap-2">
-          {SEASONS.map((season) => (
-            <Pill
-              key={season}
-              label={season}
-              selected={seasons.has(season)}
-              onPress={() => onToggleSeason(season)}
-            />
-          ))}
-        </View>
-      </View>
-
-      <View>
-        <Text variant="label" className="mb-1">
-          Notes (optional)
-        </Text>
-        <TextInput
-          value={notes}
-          onChangeText={onChangeNotes}
-          placeholder="Anything to remember while packing"
-          placeholderTextColor="#a8a29e"
-          multiline
-          numberOfLines={3}
-          textAlignVertical="top"
-          className="px-4 py-3 rounded-lg border border-line dark:border-line-dark text-ink dark:text-ink-dark"
-          style={{ minHeight: 80 }}
-        />
-      </View>
-
-      <Button label="Build capsule" onPress={onBuild} />
-    </View>
-  );
-}
-
-function NumberField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <View className="flex-1">
-      <Text variant="label" className="mb-1">
-        {label}
-      </Text>
-      <TextInput
-        value={value}
-        onChangeText={onChange}
-        keyboardType="numbers-and-punctuation"
-        className="h-12 px-4 rounded-lg border border-line dark:border-line-dark text-ink dark:text-ink-dark"
-      />
-    </View>
-  );
-}
-
-function CapsulePreview({
-  capsule,
-  saving,
-  onSave,
-}: {
-  capsule: Capsule;
-  saving: boolean;
-  onSave: () => void;
-}) {
-  return (
-    <View className="mt-8 gap-4">
-      <View className="rounded-xl border border-line dark:border-line-dark p-4">
-        <Text variant="caption" className="uppercase tracking-widest">
-          Capsule
-        </Text>
-        <Text variant="title">{capsule.itemCount} pieces</Text>
-        <Text variant="caption" className="mt-1">
-          Picked for color and style fit across the slots below.
-        </Text>
-      </View>
-
-      {Object.entries(capsule.byCategory).map(([category, list]) => {
-        if (list.length === 0) return null;
-        return (
-          <CategoryRow key={category} category={category} items={list} />
-        );
-      })}
-
-      <Button label="Save trip" onPress={onSave} loading={saving} size="lg" />
-    </View>
-  );
-}
-
-function CategoryRow({
-  category,
-  items,
-}: {
-  category: string;
-  items: Capsule["byCategory"][keyof Capsule["byCategory"]];
-}) {
-  return (
-    <View>
-      <Text variant="label" className="mb-2">
-        {category} ({items.length})
-      </Text>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 8 }}
-      >
-        {items.map((item) => (
-          <View key={item.id} style={{ width: 110 }}>
-            <ItemCard item={item} />
-          </View>
-        ))}
-      </ScrollView>
-    </View>
-  );
-}
+  trimmedName: string;
+  itemCount: number;
+}): string | null => {
+  if (trimmedName.length === 0) return "Add a name to save";
+  if (itemCount === 0) return "Widen filters to fill the capsule";
+  return null;
+};
 
 const parseInputNumber = (raw: string, fallback: number): number => {
   const parsed = Number(raw);
@@ -392,9 +201,4 @@ const inclusiveDaysBetween = (start: Date, end: Date): number => {
   const diff = calendarDaysBetween(start, end);
   if (diff < 0) return 1;
   return diff + 1;
-};
-
-const tripDurationLabel = (days: number): string => {
-  if (days === 1) return "1 day";
-  return `${days} days`;
 };

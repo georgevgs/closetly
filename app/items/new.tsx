@@ -18,6 +18,8 @@ import { Screen } from "~/components/ui/Screen";
 import { Text } from "~/components/ui/Text";
 import { Button } from "~/components/ui/Button";
 import { Pill } from "~/components/ui/Pill";
+import { Section } from "~/features/closet/components/Section";
+import { ItemFormBar } from "~/features/closet/components/ItemFormBar";
 import {
   PRESET_PALETTE,
   buildPalette,
@@ -36,6 +38,12 @@ import {
   removeBackground,
   type BgRemoveResult,
 } from "expo-bg-remover";
+import {
+  trimmedNameOrNull,
+  parsePriceInput,
+  normaliseCurrencyInput,
+  parsePurchasedOnInput,
+} from "~/features/closet/itemFormParsers";
 import { useCategoryPrefs } from "~/providers/CategoryPrefsProvider";
 import {
   CATEGORIES,
@@ -56,12 +64,6 @@ import {
 const pickInitialCategory = (visible: readonly Category[]): Category => {
   if (visible.length > 0) return visible[0];
   return CATEGORIES[0];
-};
-
-const nameOrNull = (raw: string): string | null => {
-  const trimmed = raw.trim();
-  if (trimmed.length === 0) return null;
-  return trimmed;
 };
 
 const swatchBorderClass = (selected: boolean): string => {
@@ -209,15 +211,10 @@ export default function NewItemScreen() {
     });
   }
 
+  const blockedReason = blockedReasonFor({ photoUri, palette });
+
   function save() {
-    if (!photoUri) {
-      toast.error("Add a photo first");
-      return;
-    }
-    if (!palette) {
-      toast.error("Pick at least one color");
-      return;
-    }
+    if (!photoUri || !palette) return;
     const colors = [palette.primary, palette.secondary, palette.tertiary].filter(
       (color): color is NonNullable<typeof color> => Boolean(color)
     );
@@ -225,7 +222,7 @@ export default function NewItemScreen() {
       {
         photoUri,
         category,
-        name: nameOrNull(name),
+        name: trimmedNameOrNull(name),
         styles: [...styles],
         seasons: [...seasons],
         pattern,
@@ -491,77 +488,30 @@ export default function NewItemScreen() {
           />
         </Section>
 
-        <Button
-          label="Save to closet"
-          onPress={save}
-          loading={create.isPending}
-          size="lg"
-        />
       </ScrollView>
+      <ItemFormBar
+        label="Save to closet"
+        onSave={save}
+        saving={create.isPending}
+        hint={blockedReason}
+      />
     </Screen>
   );
 }
+
+const blockedReasonFor = ({
+  photoUri,
+  palette,
+}: {
+  photoUri: string | null;
+  palette: ReturnType<typeof buildPalette>;
+}): string | null => {
+  if (!photoUri) return "Add a photo first";
+  if (!palette) return "Pick at least one color";
+  return null;
+};
 
 const seasonsSubtitle = (touched: boolean): string => {
   if (touched) return "Pick all that apply";
   return "Suggested from warmth — tap to adjust";
 };
-
-const parsePriceInput = (raw: string): number | null => {
-  const trimmed = raw.trim();
-  if (trimmed.length === 0) return null;
-  const parsed = Number(trimmed.replace(",", "."));
-  if (Number.isNaN(parsed)) return null;
-  if (parsed < 0) return null;
-  return parsed;
-};
-
-const normaliseCurrencyInput = (raw: string): string | null => {
-  const trimmed = raw.trim().toUpperCase();
-  if (trimmed.length !== 3) return null;
-  if (!/^[A-Z]{3}$/.test(trimmed)) return null;
-  return trimmed;
-};
-
-// Validates loosely — Postgres rejects malformed dates with a clear error;
-// we just want to avoid sending obvious garbage like "tomorrow".
-const parsePurchasedOnInput = (raw: string): string | null => {
-  const trimmed = raw.trim();
-  if (trimmed.length === 0) return null;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return null;
-  return trimmed;
-};
-
-const renderSubtitleSlot = (subtitle?: string): React.ReactNode => {
-  if (subtitle) {
-    return (
-      <Text variant="caption" className="mb-3">
-        {subtitle}
-      </Text>
-    );
-  }
-  return <View className="mb-2" />;
-};
-
-function Section({
-  title,
-  subtitle,
-  accessory,
-  children,
-}: {
-  title: string;
-  subtitle?: string;
-  accessory?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <View>
-      <View className="flex-row items-center justify-between mb-1">
-        <Text variant="label">{title}</Text>
-        {accessory}
-      </View>
-      {renderSubtitleSlot(subtitle)}
-      {children}
-    </View>
-  );
-}

@@ -1,4 +1,5 @@
-import { ScrollView, View, Pressable } from "react-native";
+import { useState } from "react";
+import { Alert, ScrollView, View, Pressable } from "react-native";
 import { Screen } from "~/components/ui/Screen";
 import { Text } from "~/components/ui/Text";
 import { Button } from "~/components/ui/Button";
@@ -35,19 +36,29 @@ const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
 export default function ProfileScreen() {
   const { session } = useAuth();
   const { preference, setPreference } = useThemePreference();
-  const { isHidden, toggle } = useCategoryPrefs();
+  const { isHidden, toggle, visible } = useCategoryPrefs();
+  const [signingOut, setSigningOut] = useState(false);
 
   const resetSuggestionInteractions = useSuggestionInteractions(
     (state) => state.reset,
   );
 
-  const signOut = async () => {
+  const performSignOut = async () => {
+    setSigningOut(true);
     const { error } = await supabase.auth.signOut();
+    setSigningOut(false);
     if (error) {
       handleError(error, { fallbackMessage: "Couldn't sign out." });
       return;
     }
     resetSuggestionInteractions();
+  };
+
+  const confirmSignOut = () => {
+    Alert.alert("Sign out?", "You'll need your email to sign back in.", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Sign out", style: "destructive", onPress: performSignOut },
+    ]);
   };
 
   return (
@@ -67,12 +78,12 @@ export default function ProfileScreen() {
           <View>
             <Text variant="label">Appearance</Text>
             <View className="mt-2 flex-row rounded-full border border-line dark:border-line-dark p-1">
-              {THEME_OPTIONS.map((opt) => {
-                const selected = preference === opt.value;
+              {THEME_OPTIONS.map((option) => {
+                const selected = preference === option.value;
                 return (
                   <Pressable
-                    key={opt.value}
-                    onPress={() => setPreference(opt.value)}
+                    key={option.value}
+                    onPress={() => setPreference(option.value)}
                     className={cn(
                       "flex-1 h-9 rounded-full items-center justify-center",
                       selected && "bg-ink dark:bg-ink-dark",
@@ -81,12 +92,11 @@ export default function ProfileScreen() {
                     <Text
                       className={cn(
                         "text-sm",
-                        selected
-                          ? "text-canvas dark:text-canvas-dark font-medium"
-                          : "text-ink dark:text-ink-dark",
+                        selected && "text-canvas dark:text-canvas-dark font-medium",
+                        !selected && "text-ink dark:text-ink-dark",
                       )}
                     >
-                      {opt.label}
+                      {option.label}
                     </Text>
                   </Pressable>
                 );
@@ -97,15 +107,15 @@ export default function ProfileScreen() {
           <View>
             <Text variant="label">Categories</Text>
             <Text variant="caption" className="mt-1 mb-3">
-              Tap to hide ones you don&apos;t wear
+              {categoriesCaption(visible.length)}
             </Text>
             <View className="flex-row flex-wrap gap-2">
-              {CATEGORIES.map((c) => (
+              {CATEGORIES.map((category) => (
                 <Pill
-                  key={c}
-                  label={CATEGORY_LABELS[c]}
-                  selected={!isHidden(c)}
-                  onPress={() => toggle(c)}
+                  key={category}
+                  label={CATEGORY_LABELS[category]}
+                  selected={!isHidden(category)}
+                  onPress={() => toggle(category)}
                 />
               ))}
             </View>
@@ -118,9 +128,20 @@ export default function ProfileScreen() {
           <LegalLinks />
         </View>
         <View className="mt-auto pt-12">
-          <Button label="Sign out" variant="secondary" onPress={signOut} />
+          <Button
+            label="Sign out"
+            variant="secondary"
+            onPress={confirmSignOut}
+            loading={signingOut}
+          />
         </View>
       </ScrollView>
     </Screen>
   );
 }
+
+const categoriesCaption = (visibleCount: number): string => {
+  const total = CATEGORIES.length;
+  if (visibleCount === total) return `Showing all ${total} — tap to hide ones you don't wear`;
+  return `Showing ${visibleCount} of ${total} — tap a hidden category to bring it back`;
+};

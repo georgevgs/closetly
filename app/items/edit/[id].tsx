@@ -10,12 +10,20 @@ import { Screen } from "~/components/ui/Screen";
 import { Text } from "~/components/ui/Text";
 import { Button } from "~/components/ui/Button";
 import { Pill } from "~/components/ui/Pill";
+import { Section } from "~/features/closet/components/Section";
+import { ItemFormBar } from "~/features/closet/components/ItemFormBar";
 import { useItem, useUpdateItem, useReplaceItemPhoto } from "~/features/closet/hooks/useItems";
 import { signItemUrls } from "~/features/closet/mapper";
 import { seasonsForWarmth } from "~/lib/seasons";
 import { ensureCameraPermission } from "~/lib/permissions";
 import { isBgRemovalAvailable, removeBackground } from "expo-bg-remover";
 import { useCategoryPrefs } from "~/providers/CategoryPrefsProvider";
+import {
+  trimmedNameOrNull,
+  parsePriceInput,
+  normaliseCurrencyInput,
+  parsePurchasedOnInput,
+} from "~/features/closet/itemFormParsers";
 import {
   STYLES,
   SEASONS,
@@ -371,40 +379,14 @@ export default function EditItemScreen() {
           />
         </Section>
 
-        <Button
-          label="Save changes"
-          onPress={save}
-          loading={update.isPending}
-          size="lg"
-        />
       </ScrollView>
+      <ItemFormBar
+        label="Save changes"
+        onSave={save}
+        saving={update.isPending}
+        hint={null}
+      />
     </Screen>
-  );
-}
-
-function Section({
-  title,
-  subtitle,
-  children,
-}: {
-  title: string;
-  subtitle?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <View>
-      <Text variant="label" className="mb-1">
-        {title}
-      </Text>
-      {subtitle ? (
-        <Text variant="caption" className="mb-3">
-          {subtitle}
-        </Text>
-      ) : (
-        <View className="mb-2" />
-      )}
-      {children}
-    </View>
   );
 }
 
@@ -416,12 +398,6 @@ const initialFit = (silhouette: Silhouette | null): Fit | null => {
 const initialName = (name: string | null): string => {
   if (name === null) return "";
   return name;
-};
-
-const trimmedNameOrNull = (name: string): string | null => {
-  const trimmed = name.trim();
-  if (trimmed.length === 0) return null;
-  return trimmed;
 };
 
 const initialPriceText = (price: number | null): string => {
@@ -437,29 +413,6 @@ const initialCurrencyText = (currency: string | null): string => {
 const initialPurchasedOnText = (purchasedOn: string | null): string => {
   if (purchasedOn === null) return "";
   return purchasedOn;
-};
-
-const parsePriceInput = (raw: string): number | null => {
-  const trimmed = raw.trim();
-  if (trimmed.length === 0) return null;
-  const parsed = Number(trimmed.replace(",", "."));
-  if (Number.isNaN(parsed)) return null;
-  if (parsed < 0) return null;
-  return parsed;
-};
-
-const normaliseCurrencyInput = (raw: string): string | null => {
-  const trimmed = raw.trim().toUpperCase();
-  if (trimmed.length !== 3) return null;
-  if (!/^[A-Z]{3}$/.test(trimmed)) return null;
-  return trimmed;
-};
-
-const parsePurchasedOnInput = (raw: string): string | null => {
-  const trimmed = raw.trim();
-  if (trimmed.length === 0) return null;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return null;
-  return trimmed;
 };
 
 // Preserve any non-fit silhouette fields (length, rise) the vision pass set.

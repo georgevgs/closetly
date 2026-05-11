@@ -8,6 +8,7 @@ import { Text } from "~/components/ui/Text";
 import { GlassSurface } from "~/components/ui/GlassSurface";
 import { useTrip, type TripDetail, type TripItemEntry } from "~/features/trips/hooks/useTrip";
 import { useToggleTripItemPacked } from "~/features/trips/hooks/useToggleTripItemPacked";
+import { useSetAllTripItemsPacked } from "~/features/trips/hooks/useSetAllTripItemsPacked";
 import { useDeleteTrip } from "~/features/trips/hooks/useTrips";
 import { PackingList } from "~/features/trips/components/PackingList";
 import { parseDateOnly } from "~/lib/dates";
@@ -16,6 +17,7 @@ export default function TripDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: trip, isLoading } = useTrip(id);
   const togglePacked = useToggleTripItemPacked();
+  const setAllPacked = useSetAllTripItemsPacked();
   const deleteTrip = useDeleteTrip();
   const { colorScheme } = useColorScheme();
   const fg = colorScheme === "dark" ? "#f5f3ef" : "#1a1a1a";
@@ -56,6 +58,14 @@ export default function TripDetailScreen() {
     ]);
   };
 
+  const handlePackAll = () => {
+    setAllPacked.mutate({ tripId: trip.id, packed: true });
+  };
+
+  const handleUnpackAll = () => {
+    setAllPacked.mutate({ tripId: trip.id, packed: false });
+  };
+
   return (
     <Screen edges={["bottom"]}>
       <Stack.Screen
@@ -71,7 +81,11 @@ export default function TripDetailScreen() {
       />
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60, gap: 20 }}>
         <TripHeaderCard trip={trip} />
-        <PackingProgressCard items={trip.items} />
+        <PackingProgressCard
+          items={trip.items}
+          onPackAll={handlePackAll}
+          onUnpackAll={handleUnpackAll}
+        />
         <PackingList entries={trip.items} onToggle={handleToggle} />
       </ScrollView>
     </Screen>
@@ -167,7 +181,15 @@ function TripHeaderCard({ trip }: { trip: TripDetail }) {
   );
 }
 
-function PackingProgressCard({ items }: { items: TripItemEntry[] }) {
+function PackingProgressCard({
+  items,
+  onPackAll,
+  onUnpackAll,
+}: {
+  items: TripItemEntry[];
+  onPackAll: () => void;
+  onUnpackAll: () => void;
+}) {
   const packed = countPacked(items);
   const total = items.length;
   return (
@@ -177,10 +199,44 @@ function PackingProgressCard({ items }: { items: TripItemEntry[] }) {
         <Text variant="caption">{progressFraction(packed, total)}</Text>
       </View>
       <ProgressBar packed={packed} total={total} />
-      <Text variant="caption" className="mt-2">
-        {progressMessage(packed, total)}
-      </Text>
+      <View className="mt-2 flex-row items-center justify-between">
+        <Text variant="caption" className="flex-1 pr-2">
+          {progressMessage(packed, total)}
+        </Text>
+        <BatchPackButton
+          packedCount={packed}
+          totalCount={total}
+          onPackAll={onPackAll}
+          onUnpackAll={onUnpackAll}
+        />
+      </View>
     </View>
+  );
+}
+
+function BatchPackButton({
+  packedCount,
+  totalCount,
+  onPackAll,
+  onUnpackAll,
+}: {
+  packedCount: number;
+  totalCount: number;
+  onPackAll: () => void;
+  onUnpackAll: () => void;
+}) {
+  if (totalCount === 0) return null;
+  const allPacked = packedCount === totalCount;
+  return (
+    <Pressable
+      onPress={allPacked ? onUnpackAll : onPackAll}
+      hitSlop={8}
+      accessibilityRole="button"
+      accessibilityLabel={allPacked ? "Unpack all" : "Pack all"}
+      className="px-3 py-1.5 rounded-full border border-line dark:border-line-dark"
+    >
+      <Text variant="caption">{allPacked ? "Unpack all" : "Pack all"}</Text>
+    </Pressable>
   );
 }
 

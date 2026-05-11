@@ -5,6 +5,15 @@ import type { OutfitSuggestion } from "~/lib/outfit/combinator";
 
 type SuggestionHandler = (suggestion: OutfitSuggestion, key: string) => void;
 
+export const visibleSuggestions = (
+  suggestions: OutfitSuggestion[],
+  dismissedKeys: Set<string>,
+): OutfitSuggestion[] => {
+  return suggestions.filter(
+    (suggestion) => !dismissedKeys.has(suggestionKey(suggestion)),
+  );
+};
+
 export function SuggestionsList({
   suggestions,
   savedKeys,
@@ -22,9 +31,7 @@ export function SuggestionsList({
   onWear: SuggestionHandler;
   onDismiss: SuggestionHandler;
 }) {
-  const visible = suggestions.filter(
-    (suggestion) => !dismissedKeys.has(suggestionKey(suggestion)),
-  );
+  const visible = visibleSuggestions(suggestions, dismissedKeys);
 
   if (visible.length === 0) {
     return <EmptyState hasAnySuggestions={suggestions.length > 0} />;

@@ -6,8 +6,9 @@ import { toast } from "sonner-native";
 import { Screen } from "~/components/ui/Screen";
 import { Text } from "~/components/ui/Text";
 import { Pill } from "~/components/ui/Pill";
-import { Button } from "~/components/ui/Button";
 import { DateField } from "~/components/ui/DateField";
+import { NumberField } from "~/features/trips/components/NumberField";
+import { EditTripBar } from "~/features/trips/components/EditTripBar";
 import { useTrip, type TripDetail } from "~/features/trips/hooks/useTrip";
 import { useUpdateTrip } from "~/features/trips/hooks/useTrips";
 import { parseDateOnly } from "~/lib/dates";
@@ -44,20 +45,14 @@ export default function EditTripScreen() {
   }, [trip, hydrated]);
 
   const toggleSeason = (season: Season) => {
-    const next = new Set(seasons);
-    if (next.has(season)) next.delete(season);
-    else next.add(season);
-    setSeasons(next);
+    const nextSeasons = new Set(seasons);
+    if (nextSeasons.has(season)) nextSeasons.delete(season);
+    else nextSeasons.add(season);
+    setSeasons(nextSeasons);
   };
 
-  const numericTempMin = useMemo(
-    () => parseTempInput(tempMin, 0),
-    [tempMin],
-  );
-  const numericTempMax = useMemo(
-    () => parseTempInput(tempMax, 25),
-    [tempMax],
-  );
+  const numericTempMin = useMemo(() => parseTempInput(tempMin, 0), [tempMin]);
+  const numericTempMax = useMemo(() => parseTempInput(tempMax, 25), [tempMax]);
 
   const updateStartDate = (next: Date) => {
     setStartDate(next);
@@ -72,6 +67,13 @@ export default function EditTripScreen() {
     setEndDate(next);
   };
 
+  const trimmedName = name.trim();
+  const blockedReason = blockedReasonFor({
+    trimmedName,
+    numericTempMin,
+    numericTempMax,
+  });
+
   if (isLoading || !trip) {
     return (
       <Screen className="items-center justify-center">
@@ -81,15 +83,7 @@ export default function EditTripScreen() {
   }
 
   const onSave = () => {
-    const trimmedName = name.trim();
-    if (trimmedName.length === 0) {
-      toast.error("Trip name can't be empty.");
-      return;
-    }
-    if (numericTempMin > numericTempMax) {
-      toast.error("Min temperature must be at or below max.");
-      return;
-    }
+    if (blockedReason !== null) return;
     updateTrip.mutate(
       {
         id: trip.id,
@@ -113,7 +107,7 @@ export default function EditTripScreen() {
 
   return (
     <Screen edges={["bottom"]}>
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60, gap: 20 }}>
+      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 32, gap: 20 }}>
         <Field label="Trip name">
           <TextInput
             value={name}
@@ -153,7 +147,7 @@ export default function EditTripScreen() {
           <Text variant="label" className="mb-2">
             Seasons
           </Text>
-          <View className="flex-row gap-2">
+          <View className="flex-row gap-2 flex-wrap">
             {SEASONS.map((season) => (
               <Pill
                 key={season}
@@ -178,14 +172,13 @@ export default function EditTripScreen() {
             style={{ minHeight: 80 }}
           />
         </Field>
-
-        <Button
-          label="Save changes"
-          onPress={onSave}
-          loading={updateTrip.isPending}
-          size="lg"
-        />
       </ScrollView>
+
+      <EditTripBar
+        onSave={onSave}
+        saving={updateTrip.isPending}
+        hint={blockedReason}
+      />
     </Screen>
   );
 }
@@ -207,29 +200,19 @@ function Field({
   );
 }
 
-function NumberField({
-  label,
-  value,
-  onChange,
+const blockedReasonFor = ({
+  trimmedName,
+  numericTempMin,
+  numericTempMax,
 }: {
-  label: string;
-  value: string;
-  onChange: (next: string) => void;
-}) {
-  return (
-    <View className="flex-1">
-      <Text variant="label" className="mb-1">
-        {label}
-      </Text>
-      <TextInput
-        value={value}
-        onChangeText={onChange}
-        keyboardType="numbers-and-punctuation"
-        className="h-12 px-4 rounded-lg border border-line dark:border-line-dark text-ink dark:text-ink-dark"
-      />
-    </View>
-  );
-}
+  trimmedName: string;
+  numericTempMin: number;
+  numericTempMax: number;
+}): string | null => {
+  if (trimmedName.length === 0) return "Add a trip name";
+  if (numericTempMin > numericTempMax) return "Min °C must be at or below Max °C";
+  return null;
+};
 
 type Setters = {
   setName: (next: string) => void;

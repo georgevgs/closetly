@@ -105,13 +105,13 @@ export default function ItemDetail() {
             Colors
           </Text>
           <View className="flex-row gap-3">
-            {display.colors.map((c, i) => (
-              <View key={i} className="items-center">
+            {display.colors.map((color, colorIndex) => (
+              <View key={colorIndex} className="items-center">
                 <View
                   className="w-10 h-10 rounded-full border border-line"
-                  style={{ backgroundColor: c.hex }}
+                  style={{ backgroundColor: color.hex }}
                 />
-                <Text variant="caption">{c.hex}</Text>
+                <Text variant="caption">{color.hex}</Text>
               </View>
             ))}
           </View>
@@ -156,26 +156,36 @@ export default function ItemDetail() {
           }
         />
 
-        <Pressable
-          onPress={() =>
-            Alert.alert("Remove item", "This will hide it from your closet.", [
-              { text: "Cancel", style: "cancel" },
-              {
-                text: "Remove",
-                style: "destructive",
-                onPress: () =>
-                  del.mutate(display.id, { onSuccess: () => router.back() }),
-              },
-            ])
-          }
-          className="items-center py-3"
-        >
-          <Text className="text-red-600">Remove</Text>
-        </Pressable>
+        <Button
+          label="Remove from closet"
+          variant="destructive"
+          onPress={() => confirmRemoval(display.name, display.id, del.mutate)}
+          loading={del.isPending}
+        />
       </ScrollView>
     </Screen>
   );
 }
+
+const confirmRemoval = (
+  name: string | null,
+  itemId: string,
+  remove: (id: string, options: { onSuccess: () => void }) => void,
+) => {
+  Alert.alert(removalTitle(name), "This will hide it from your closet.", [
+    { text: "Cancel", style: "cancel" },
+    {
+      text: "Remove",
+      style: "destructive",
+      onPress: () => remove(itemId, { onSuccess: () => router.back() }),
+    },
+  ]);
+};
+
+const removalTitle = (name: string | null): string => {
+  if (name === null) return "Remove this item?";
+  return `Remove "${name}"?`;
+};
 
 function PriceSection({ item }: { item: Item }) {
   if (item.price === null && item.purchasedOn === null) return null;

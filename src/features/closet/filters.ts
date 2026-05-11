@@ -8,6 +8,13 @@ export type ClosetFilters = {
   occasions: Set<Occasion>;
 };
 
+export type TagGroup = "styles" | "seasons" | "patterns" | "occasions";
+
+export type ActiveTag = {
+  group: TagGroup;
+  value: string;
+};
+
 export const emptyClosetFilters = (): ClosetFilters => ({
   searchText: "",
   styles: new Set(),
@@ -23,6 +30,24 @@ export const tagFilterCount = (filters: ClosetFilters): number => {
     filters.patterns.size +
     filters.occasions.size
   );
+};
+
+export const listActiveTags = (filters: ClosetFilters): ActiveTag[] => {
+  const tags: ActiveTag[] = [];
+  for (const value of filters.styles) tags.push({ group: "styles", value });
+  for (const value of filters.seasons) tags.push({ group: "seasons", value });
+  for (const value of filters.patterns) tags.push({ group: "patterns", value });
+  for (const value of filters.occasions) tags.push({ group: "occasions", value });
+  return tags;
+};
+
+export const removeActiveTag = (
+  filters: ClosetFilters,
+  tag: ActiveTag,
+): ClosetFilters => {
+  const nextSet = new Set(filters[tag.group]);
+  nextSet.delete(tag.value as never);
+  return { ...filters, [tag.group]: nextSet };
 };
 
 export const applyClosetFilters = (

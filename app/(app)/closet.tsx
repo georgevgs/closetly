@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { View, Pressable, ScrollView, ActivityIndicator, TextInput } from "react-native";
+import { View, Pressable, ScrollView, ActivityIndicator } from "react-native";
 import { useColorScheme } from "nativewind";
 import { FlashList } from "@shopify/flash-list";
 import { router } from "expo-router";
@@ -13,13 +13,20 @@ import { Pill } from "~/components/ui/Pill";
 import { GlassSurface } from "~/components/ui/GlassSurface";
 import { ItemCard } from "~/features/closet/components/ItemCard";
 import { ClosetFilterSheet } from "~/features/closet/components/ClosetFilterSheet";
+import { ActiveFilterChips } from "~/features/closet/components/ActiveFilterChips";
+import { SearchField } from "~/features/closet/components/SearchField";
+import { ClosetEmptyState } from "~/features/closet/components/ClosetEmptyState";
 import { useSignedItems } from "~/features/closet/hooks/useSignedItems";
 import { useAuth } from "~/features/auth/context";
 import { useCategoryPrefs } from "~/providers/CategoryPrefsProvider";
+import { useDebouncedValue } from "~/hooks/useDebouncedValue";
 import {
   applyClosetFilters,
   emptyClosetFilters,
+  listActiveTags,
+  removeActiveTag,
   tagFilterCount,
+  type ActiveTag,
   type ClosetFilters,
 } from "~/features/closet/filters";
 import { CATEGORIES, type Category, type Item } from "~/types/items";
@@ -43,6 +50,8 @@ const SORT_LABEL: Record<SortMode, string> = {
   category: "Category",
 };
 
+const SEARCH_DEBOUNCE_MS = 150;
+
 export default function ClosetScreen() {
   const { session } = useAuth();
   const { data: items, isLoading } = useSignedItems(session?.user.id);
@@ -58,12 +67,27 @@ export default function ClosetScreen() {
   const { colorScheme } = useColorScheme();
   const fg = colorScheme === "dark" ? "#f5f3ef" : "#1a1a1a";
 
+  const debouncedSearchText = useDebouncedValue(filters.searchText, SEARCH_DEBOUNCE_MS);
+  const filtersForApply = useMemo(
+    () => ({ ...filters, searchText: debouncedSearchText }),
+    [filters, debouncedSearchText],
+  );
+
   const visibleItems = useMemo(() => {
     if (!items) return [];
-    const filtered = applyClosetFilters(items, filters);
+    const filtered = applyClosetFilters(items, filtersForApply);
     const byCategory = filterByCategory(filtered, filter);
     return sortItems(byCategory, sort);
-  }, [items, filters, filter, sort]);
+  }, [items, filtersForApply, filter, sort]);
+
+  const totalCount = items ? items.length : 0;
+  const visibleCount = visibleItems.length;
+  const activeTags = listActiveTags(filters);
+  const hasActiveFilters = isFiltering({
+    activeTagCount: activeTags.length,
+    searchText: filters.searchText,
+    categoryFilter: filter,
+  });
 
   const cycleSort = () => {
     Haptics.selectionAsync();
@@ -90,6 +114,15 @@ export default function ClosetScreen() {
     }));
   };
 
+  const removeTag = (tag: ActiveTag) => {
+    setFilters((current) => removeActiveTag(current, tag));
+  };
+
+  const clearEverything = () => {
+    setFilters(emptyClosetFilters());
+    setFilter("all");
+  };
+
   return (
     <Screen>
       <ClosetHeader sort={sort} onCycleSort={cycleSort} fg={fg} />
@@ -99,12 +132,28 @@ export default function ClosetScreen() {
         activeFilterCount={tagFilterCount(filters)}
         onOpenFilters={openFilterSheet}
       />
+      <ActiveFilterChips
+        tags={activeTags}
+        onRemove={removeTag}
+        onClearAll={clearTagFilters}
+      />
       <CategoryRow
         visibleCategories={visibleCategories}
         active={filter}
         onSelect={setFilter}
       />
-      <ClosetBody isLoading={isLoading} items={visibleItems} />
+      <CountBadge
+        visibleCount={visibleCount}
+        totalCount={totalCount}
+        isLoading={isLoading}
+      />
+      <ClosetBody
+        isLoading={isLoading}
+        items={visibleItems}
+        hasAnyItems={totalCount > 0}
+        hasActiveFilters={hasActiveFilters}
+        onClearEverything={clearEverything}
+      />
       <ClosetFilterSheet
         ref={filterSheetRef}
         filters={filters}
@@ -216,14 +265,7 @@ function SearchAndFilterBar({
 }) {
   return (
     <View className="flex-row items-center gap-2 px-6 pb-2">
-      <TextInput
-        value={searchText}
-        onChangeText={onChangeSearchText}
-        placeholder="Search by name or brand"
-        placeholderTextColor="#a8a29e"
-        className="flex-1 h-10 px-4 rounded-full border border-line dark:border-line-dark text-ink dark:text-ink-dark"
-        returnKeyType="search"
-      />
+      <SearchField value={searchText} onChange={onChangeSearchText} />
       <Pressable
         onPress={onOpenFilters}
         hitSlop={8}
@@ -231,6 +273,24 @@ function SearchAndFilterBar({
       >
         <Text variant="caption">{filterButtonLabel(activeFilterCount)}</Text>
       </Pressable>
+    </View>
+  );
+}
+
+function CountBadge({
+  visibleCount,
+  totalCount,
+  isLoading,
+}: {
+  visibleCount: number;
+  totalCount: number;
+  isLoading: boolean;
+}) {
+  if (isLoading) return null;
+  if (totalCount === 0) return null;
+  return (
+    <View className="px-6 pt-2 pb-1">
+      <Text variant="caption">{countLabel(visibleCount, totalCount)}</Text>
     </View>
   );
 }
@@ -269,9 +329,15 @@ function CategoryRow({
 function ClosetBody({
   isLoading,
   items,
+  hasAnyItems,
+  hasActiveFilters,
+  onClearEverything,
 }: {
   isLoading: boolean;
   items: Item[];
+  hasAnyItems: boolean;
+  hasActiveFilters: boolean;
+  onClearEverything: () => void;
 }) {
   if (isLoading) {
     return (
@@ -280,7 +346,15 @@ function ClosetBody({
       </View>
     );
   }
-  if (items.length === 0) return <EmptyState />;
+  if (items.length === 0) {
+    return (
+      <ClosetEmptyState
+        hasAnyItems={hasAnyItems}
+        hasActiveFilters={hasActiveFilters}
+        onClearFilters={onClearEverything}
+      />
+    );
+  }
   return <ItemGrid items={items} />;
 }
 
@@ -298,25 +372,6 @@ function ItemGrid({ items }: { items: Item[] }) {
           </View>
         )}
       />
-    </View>
-  );
-}
-
-function EmptyState() {
-  return (
-    <View className="flex-1 items-center justify-center px-12">
-      <Text variant="title" className="text-center mb-2">
-        Nothing matches
-      </Text>
-      <Text variant="caption" className="text-center mb-6">
-        Try clearing the search or filters, or add a new piece.
-      </Text>
-      <Pressable
-        onPress={() => router.push("/items/new")}
-        className="h-12 px-6 rounded-lg bg-ink dark:bg-ink-dark items-center justify-center"
-      >
-        <Text className="text-canvas dark:text-canvas-dark font-medium">Add an item</Text>
-      </Pressable>
     </View>
   );
 }
@@ -348,4 +403,27 @@ const sortItems = (items: Item[], sort: SortMode): Item[] => {
 const filterButtonLabel = (activeCount: number): string => {
   if (activeCount === 0) return "Filters";
   return `Filters · ${activeCount}`;
+};
+
+const countLabel = (visibleCount: number, totalCount: number): string => {
+  if (visibleCount === totalCount) {
+    if (totalCount === 1) return "1 piece";
+    return `${totalCount} pieces`;
+  }
+  return `${visibleCount} of ${totalCount} pieces`;
+};
+
+const isFiltering = ({
+  activeTagCount,
+  searchText,
+  categoryFilter,
+}: {
+  activeTagCount: number;
+  searchText: string;
+  categoryFilter: Category | "all";
+}): boolean => {
+  if (activeTagCount > 0) return true;
+  if (searchText.trim().length > 0) return true;
+  if (categoryFilter !== "all") return true;
+  return false;
 };

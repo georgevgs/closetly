@@ -13,7 +13,10 @@ import { useOutfitActions } from "~/features/outfits/hooks/useOutfitActions";
 import { useRecentWears } from "~/features/wear/hooks/useRecentWears";
 import { useWeather, type WeatherSnapshot } from "~/features/weather/useWeather";
 import { suggestOutfits, type OutfitSuggestion } from "~/lib/outfit/combinator";
-import { SuggestionsList } from "~/features/outfits/components/SuggestionsList";
+import {
+  SuggestionsList,
+  visibleSuggestions,
+} from "~/features/outfits/components/SuggestionsList";
 import { toWeatherContext } from "~/features/outfits/weatherContext";
 import { OCCASIONS, type Item, type Occasion } from "~/types/items";
 
@@ -55,11 +58,16 @@ export default function SuggestScreen() {
     );
   }
 
+  const visibleCount = visibleSuggestions(suggestions, actions.dismissedKeys).length;
+
   return (
     <Screen>
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
         <AnchorHeader anchor={anchor} weather={weather} />
         <OccasionPicker selected={targetOccasion} onSelect={setTargetOccasion} />
+        {!isComputing && (
+          <SuggestionCount count={visibleCount} occasion={targetOccasion} />
+        )}
         {isComputing && <ComputingState />}
         {!isComputing && (
           <SuggestionsList
@@ -76,6 +84,25 @@ export default function SuggestScreen() {
     </Screen>
   );
 }
+
+function SuggestionCount({
+  count,
+  occasion,
+}: {
+  count: number;
+  occasion: Occasion | null;
+}) {
+  if (count === 0) return null;
+  return (
+    <Text variant="caption">{suggestionCountLabel(count, occasion)}</Text>
+  );
+}
+
+const suggestionCountLabel = (count: number, occasion: Occasion | null): string => {
+  const noun = count === 1 ? "outfit" : "outfits";
+  if (occasion === null) return `${count} ${noun}`;
+  return `${count} ${noun} for ${occasion}`;
+};
 
 function AnchorHeader({
   anchor,
