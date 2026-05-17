@@ -1,4 +1,4 @@
-import type { Item, Occasion } from "../../types/items";
+import type { Item, Occasion, Style } from "../../types/items";
 import { suggestOutfits, type OutfitSuggestion } from "./combinator";
 import { pickAnchorsForToday } from "./anchorPicker";
 import type { WeatherContext } from "./score";
@@ -8,6 +8,8 @@ export type TodayOutfitOptions = {
   weather?: WeatherContext;
   pairAffinity?: Map<string, number>;
   recentlyWornItemIds?: Map<string, number>;
+  preferredStyles?: ReadonlySet<Style>;
+  itemWearCounts?: Map<string, number>;
   targetOccasion?: Occasion;
   count?: number;
 };
@@ -18,6 +20,8 @@ export const suggestTodayOutfits = (opts: TodayOutfitOptions): OutfitSuggestion[
     weather,
     pairAffinity,
     recentlyWornItemIds,
+    preferredStyles,
+    itemWearCounts,
     targetOccasion,
     count = 3,
   } = opts;
@@ -39,6 +43,8 @@ export const suggestTodayOutfits = (opts: TodayOutfitOptions): OutfitSuggestion[
       weather,
       pairAffinity,
       recentlyWornItemIds,
+      preferredStyles,
+      itemWearCounts,
       targetOccasion,
       limit: 3,
     });

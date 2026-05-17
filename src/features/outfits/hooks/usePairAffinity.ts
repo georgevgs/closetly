@@ -13,8 +13,9 @@ export function usePairAffinity(userId: string | undefined) {
         .eq("user_id", userId!);
       if (error) throw error;
       const map = new Map<string, number>();
-      for (const r of data ?? []) {
-        map.set(pairKey(r.item_a, r.item_b), r.affinity);
+      if (!data) return map;
+      for (const row of data) {
+        map.set(pairKey(row.item_a, row.item_b), row.affinity);
       }
       return map;
     },

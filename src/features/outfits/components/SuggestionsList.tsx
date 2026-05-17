@@ -62,7 +62,7 @@ function EmptyState({ hasAnySuggestions }: { hasAnySuggestions: boolean }) {
     return (
       <View className="px-2 py-8">
         <Text variant="body">
-          That's all of them — try a different anchor piece for fresh combinations.
+          {"That's all of them — try a different anchor piece for fresh combinations."}
         </Text>
       </View>
     );

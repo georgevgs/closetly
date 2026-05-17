@@ -7,10 +7,16 @@ import type { BottomSheetModal } from "@gorhom/bottom-sheet";
 import { Screen } from "~/components/ui/Screen";
 import { Text } from "~/components/ui/Text";
 import { Pill } from "~/components/ui/Pill";
+import { KeyboardAvoider } from "~/components/ui/KeyboardAvoider";
 import { useAuth } from "~/features/auth/context";
 import { useSignedItems } from "~/features/closet/hooks/useSignedItems";
 import { usePairAffinity } from "~/features/outfits/hooks/usePairAffinity";
 import { useRecentWears } from "~/features/wear/hooks/useRecentWears";
+import { useItemWearCounts } from "~/features/wear/hooks/useItemWearCounts";
+import {
+  usePreferredStyles,
+  preferredStylesAsSet,
+} from "~/features/profile/stylePreferences";
 import { useWeather } from "~/features/weather/useWeather";
 import { useSaveOutfit } from "~/features/outfits/hooks/useSaveOutfit";
 import { useLogWear } from "~/features/wear/hooks/useLogWear";
@@ -41,6 +47,12 @@ export default function BuildOutfitScreen() {
   const { data: weather } = useWeather();
   const { data: pairAffinity } = usePairAffinity(session?.user.id);
   const { data: recentlyWornItemIds } = useRecentWears(session?.user.id);
+  const { data: itemWearCounts } = useItemWearCounts(session?.user.id);
+  const preferredStylesList = usePreferredStyles();
+  const preferredStyles = useMemo(
+    () => preferredStylesAsSet(preferredStylesList),
+    [preferredStylesList],
+  );
 
   const builder = useOutfitBuilder();
   const save = useSaveOutfit();
@@ -79,8 +91,17 @@ export default function BuildOutfitScreen() {
       weather: toWeatherContext(weather),
       pairAffinity,
       recentlyWornItemIds,
+      preferredStyles,
+      itemWearCounts,
     });
-  }, [builder.selectedItems, weather, pairAffinity, recentlyWornItemIds]);
+  }, [
+    builder.selectedItems,
+    weather,
+    pairAffinity,
+    recentlyWornItemIds,
+    preferredStyles,
+    itemWearCounts,
+  ]);
 
   const onSave = () => {
     save.mutate(
@@ -113,7 +134,11 @@ export default function BuildOutfitScreen() {
 
   return (
     <Screen edges={["bottom"]}>
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 20 }}>
+      <KeyboardAvoider className="flex-1">
+      <ScrollView
+        contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 20 }}
+        keyboardShouldPersistTaps="handled"
+      >
         <NameField value={name} onChange={setName} />
         <ScoreBlock score={score} itemCount={builder.selectedItems.length} />
         <SlotGrid
@@ -142,6 +167,7 @@ export default function BuildOutfitScreen() {
         onPick={handlePick}
         onRemove={handleRemove}
       />
+      </KeyboardAvoider>
     </Screen>
   );
 }
@@ -213,6 +239,7 @@ function ScoreChips({ score }: { score: ScoreBreakdown }) {
   return (
     <View className="mt-3 flex-row flex-wrap gap-1.5">
       <ScoreChip label="Color" value={score.color} />
+      {score.proportion !== null && <ScoreChip label="Palette" value={score.proportion} />}
       <ScoreChip label="Style" value={score.style} />
       <ScoreChip label="Formality" value={score.formality} />
       {score.balance !== null && <ScoreChip label="Balance" value={score.balance} />}

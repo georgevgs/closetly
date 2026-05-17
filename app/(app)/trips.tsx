@@ -82,7 +82,7 @@ export default function TripsScreen() {
   };
 
   const trimmedName = name.trim();
-  const itemCount = capsule ? capsule.itemCount : 0;
+  const itemCount = capsuleItemCount(capsule);
   const saveBlockedReason = blockedReason({ trimmedName, itemCount });
 
   const saveTrip = () => {
@@ -159,6 +159,13 @@ export default function TripsScreen() {
     </Screen>
   );
 }
+
+const capsuleItemCount = (
+  capsule: ReturnType<typeof buildCapsule> | null,
+): number => {
+  if (!capsule) return 0;
+  return capsule.itemCount;
+};
 
 const blockedReason = ({
   trimmedName,

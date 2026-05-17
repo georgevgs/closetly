@@ -10,7 +10,7 @@ import type { BottomSheetModal } from "@gorhom/bottom-sheet";
 import { Screen } from "~/components/ui/Screen";
 import { Text } from "~/components/ui/Text";
 import { Pill } from "~/components/ui/Pill";
-import { GlassSurface } from "~/components/ui/GlassSurface";
+import { CircularGlassButton } from "~/components/ui/CircularGlassButton";
 import { ItemCard } from "~/features/closet/components/ItemCard";
 import { ClosetFilterSheet } from "~/features/closet/components/ClosetFilterSheet";
 import { ActiveFilterChips } from "~/features/closet/components/ActiveFilterChips";
@@ -29,6 +29,7 @@ import {
   type ActiveTag,
   type ClosetFilters,
 } from "~/features/closet/filters";
+import { foregroundFor } from "~/lib/utils";
 import { CATEGORIES, type Category, type Item } from "~/types/items";
 
 const CATEGORY_LABELS: Record<Category, string> = {
@@ -65,7 +66,7 @@ export default function ClosetScreen() {
     if (filter !== "all" && !visibleCategories.includes(filter)) setFilter("all");
   }, [filter, visibleCategories]);
   const { colorScheme } = useColorScheme();
-  const fg = colorScheme === "dark" ? "#f5f3ef" : "#1a1a1a";
+  const foreground = foregroundFor(colorScheme);
 
   const debouncedSearchText = useDebouncedValue(filters.searchText, SEARCH_DEBOUNCE_MS);
   const filtersForApply = useMemo(
@@ -80,7 +81,7 @@ export default function ClosetScreen() {
     return sortItems(byCategory, sort);
   }, [items, filtersForApply, filter, sort]);
 
-  const totalCount = items ? items.length : 0;
+  const totalCount = totalItemCount(items);
   const visibleCount = visibleItems.length;
   const activeTags = listActiveTags(filters);
   const hasActiveFilters = isFiltering({
@@ -125,7 +126,7 @@ export default function ClosetScreen() {
 
   return (
     <Screen>
-      <ClosetHeader sort={sort} onCycleSort={cycleSort} fg={fg} />
+      <ClosetHeader sort={sort} onCycleSort={cycleSort} foreground={foreground} />
       <SearchAndFilterBar
         searchText={filters.searchText}
         onChangeSearchText={updateSearchText}
@@ -167,11 +168,11 @@ export default function ClosetScreen() {
 function ClosetHeader({
   sort,
   onCycleSort,
-  fg,
+  foreground,
 }: {
   sort: SortMode;
   onCycleSort: () => void;
-  fg: string;
+  foreground: string;
 }) {
   return (
     <View className="flex-row items-center justify-between px-6 pt-4 pb-2">
@@ -182,75 +183,44 @@ function ClosetHeader({
           hitSlop={8}
           className="flex-row items-center gap-1.5 h-9 px-3 rounded-full border border-line dark:border-line-dark"
         >
-          <SymbolView name="arrow.up.arrow.down" size={11} tintColor={fg} />
+          <SymbolView name="arrow.up.arrow.down" size={11} tintColor={foreground} />
           <Text variant="caption" className="text-ink dark:text-ink-dark">
             {SORT_LABEL[sort]}
           </Text>
         </Pressable>
-        <BuildOutfitButton fg={fg} />
-        <AddItemButton fg={fg} />
+        <CircularGlassButton
+          symbol="square.grid.2x2"
+          symbolSize={18}
+          foreground={foreground}
+          accessibilityLabel="Build outfit"
+          onPress={openBuildOutfit}
+        />
+        <CircularGlassButton
+          symbol="plus"
+          symbolSize={20}
+          foreground={foreground}
+          accessibilityLabel="Add item"
+          onPress={openNewItem}
+        />
       </View>
     </View>
   );
 }
 
-function BuildOutfitButton({ fg }: { fg: string }) {
-  return (
-    <Pressable
-      onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        router.push("/outfits/build");
-      }}
-      hitSlop={12}
-      accessibilityRole="button"
-      accessibilityLabel="Build outfit"
-    >
-      <GlassSurface
-        isInteractive
-        style={{
-          height: 44,
-          width: 44,
-          borderRadius: 22,
-          alignItems: "center",
-          justifyContent: "center",
-          overflow: "hidden",
-        }}
-        fallbackClassName="bg-canvas/70 dark:bg-canvas-dark/70 border border-line/60 dark:border-line-dark/60"
-      >
-        <SymbolView name="square.grid.2x2" size={18} tintColor={fg} weight="semibold" />
-      </GlassSurface>
-    </Pressable>
-  );
-}
+const openBuildOutfit = () => {
+  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  router.push("/outfits/build");
+};
 
-function AddItemButton({ fg }: { fg: string }) {
-  return (
-    <Pressable
-      onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        router.push("/items/new");
-      }}
-      hitSlop={12}
-      accessibilityRole="button"
-      accessibilityLabel="Add item"
-    >
-      <GlassSurface
-        isInteractive
-        style={{
-          height: 44,
-          width: 44,
-          borderRadius: 22,
-          alignItems: "center",
-          justifyContent: "center",
-          overflow: "hidden",
-        }}
-        fallbackClassName="bg-canvas/70 dark:bg-canvas-dark/70 border border-line/60 dark:border-line-dark/60"
-      >
-        <SymbolView name="plus" size={20} tintColor={fg} weight="semibold" />
-      </GlassSurface>
-    </Pressable>
-  );
-}
+const openNewItem = () => {
+  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  router.push("/items/new");
+};
+
+const totalItemCount = (items: Item[] | undefined): number => {
+  if (!items) return 0;
+  return items.length;
+};
 
 function SearchAndFilterBar({
   searchText,
@@ -382,22 +352,22 @@ const filterByCategory = (items: Item[], filter: Category | "all"): Item[] => {
 };
 
 const sortItems = (items: Item[], sort: SortMode): Item[] => {
-  const arr = [...items];
+  const sorted = [...items];
   if (sort === "newest") {
-    arr.sort((first, second) => second.created_at.localeCompare(first.created_at));
-    return arr;
+    sorted.sort((first, second) => second.created_at.localeCompare(first.created_at));
+    return sorted;
   }
   if (sort === "oldest") {
-    arr.sort((first, second) => first.created_at.localeCompare(second.created_at));
-    return arr;
+    sorted.sort((first, second) => first.created_at.localeCompare(second.created_at));
+    return sorted;
   }
-  arr.sort((first, second) => {
+  sorted.sort((first, second) => {
     const categoryDiff =
       CATEGORIES.indexOf(first.category) - CATEGORIES.indexOf(second.category);
     if (categoryDiff !== 0) return categoryDiff;
     return second.created_at.localeCompare(first.created_at);
   });
-  return arr;
+  return sorted;
 };
 
 const filterButtonLabel = (activeCount: number): string => {

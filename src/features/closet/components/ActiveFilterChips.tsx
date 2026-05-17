@@ -1,4 +1,4 @@
-import { Pressable, ScrollView, View } from "react-native";
+import { Pressable, ScrollView } from "react-native";
 import { SymbolView } from "expo-symbols";
 import { Text } from "~/components/ui/Text";
 import type { ActiveTag } from "~/features/closet/filters";

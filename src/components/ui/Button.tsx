@@ -45,31 +45,44 @@ export function Button({
   disabled,
   ...rest
 }: Props) {
-  const v = variants[variant];
+  const styles = variants[variant];
   return (
     <Pressable
       {...rest}
       disabled={disabled || loading}
-      onPress={(e) => {
+      onPress={(event) => {
         if (haptic) Haptics.selectionAsync();
-        onPress?.(e);
+        onPress?.(event);
       }}
       className={cn(
         base,
         sizes[size],
-        v.container,
+        styles.container,
         (disabled || loading) && "opacity-50",
         className
       )}
     >
-      {loading ? (
-        <ActivityIndicator color="white" />
-      ) : (
-        <View className="flex-row items-center gap-2">
-          {leading}
-          <Text className={cn("font-medium", v.text)}>{label}</Text>
-        </View>
-      )}
+      <ButtonBody loading={loading} leading={leading} label={label} textClass={styles.text} />
     </Pressable>
+  );
+}
+
+function ButtonBody({
+  loading,
+  leading,
+  label,
+  textClass,
+}: {
+  loading?: boolean;
+  leading?: React.ReactNode;
+  label: string;
+  textClass: string;
+}) {
+  if (loading) return <ActivityIndicator color="white" />;
+  return (
+    <View className="flex-row items-center gap-2">
+      {leading}
+      <Text className={cn("font-medium", textClass)}>{label}</Text>
+    </View>
   );
 }

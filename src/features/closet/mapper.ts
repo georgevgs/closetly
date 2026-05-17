@@ -56,15 +56,37 @@ const priceFromRow = (raw: ItemRow["price"]): number | null => {
 };
 
 export async function signItemUrls(items: Item[]): Promise<Item[]> {
-  const paths = items.map((i) => i.thumb_url ?? i.photo_url);
+  const paths = items.map((item) => storagePathFor(item));
   if (paths.length === 0) return items;
   const { data, error } = await supabase.storage
     .from("closet-photos")
     .createSignedUrls(paths, SIGNED_URL_TTL);
   if (error || !data) return items;
-  return items.map((item, i) => ({
-    ...item,
-    photo_url: data[i]?.signedUrl ?? item.photo_url,
-    thumb_url: data[i]?.signedUrl ?? item.thumb_url,
-  }));
+  return items.map((item, itemIndex) => signedCopy(item, data[itemIndex]?.signedUrl));
 }
+
+const storagePathFor = (item: Item): string => {
+  if (item.thumb_url) return item.thumb_url;
+  return item.photo_url;
+};
+
+// When no signed URL comes back, keep the originals as-is. When one comes back,
+// route it to both photo_url and thumb_url *only if the original had them set* —
+// preserving null on thumb_url so callers can still distinguish "thumb missing"
+// from "thumb signed".
+const signedCopy = (item: Item, signedUrl: string | null | undefined): Item => {
+  if (!signedUrl) return item;
+  return {
+    ...item,
+    photo_url: signedUrl,
+    thumb_url: thumbForSigned(item.thumb_url, signedUrl),
+  };
+};
+
+const thumbForSigned = (
+  originalThumb: string | null,
+  signedUrl: string,
+): string | null => {
+  if (originalThumb === null) return null;
+  return signedUrl;
+};

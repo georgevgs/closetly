@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { View, TextInput, Platform, KeyboardAvoidingView } from "react-native";
+import { View, TextInput } from "react-native";
 import { toast } from "sonner-native";
 
 import { Screen } from "~/components/ui/Screen";
 import { Text } from "~/components/ui/Text";
 import { Button } from "~/components/ui/Button";
+import { KeyboardAvoider } from "~/components/ui/KeyboardAvoider";
 import { ConsentLine } from "~/features/legal/components/ConsentLine";
 import { supabase } from "~/lib/supabase";
 
@@ -53,10 +54,7 @@ export default function SignIn() {
 
   return (
     <Screen className="px-6">
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        className="flex-1 justify-between py-12"
-      >
+      <KeyboardAvoider className="flex-1 justify-between py-12">
         <View>
           <Text variant="display" className="mb-2">
             Closetly
@@ -90,7 +88,7 @@ export default function SignIn() {
         )}
 
         <ConsentLine />
-      </KeyboardAvoidingView>
+      </KeyboardAvoider>
     </Screen>
   );
 }
@@ -220,3 +218,4 @@ const codeHintFor = (trimmed: string): string | null => {
   if (!/^\d{6}$/.test(trimmed)) return "Code should be 6 digits";
   return null;
 };
+

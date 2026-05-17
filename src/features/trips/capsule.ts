@@ -21,12 +21,22 @@ const SLOT_PLAN = (days: number): Partial<Record<Category, number>> => ({
   top: Math.max(2, Math.min(7, Math.ceil(days / 2))),
   bottom: Math.max(1, Math.min(4, Math.ceil(days / 3))),
   outerwear: 1,
-  shoes: days >= 4 ? 2 : 1,
-  dress: days >= 4 ? 1 : 0,
+  shoes: shoesCountFor(days),
+  dress: dressCountFor(days),
   bag: 1,
   accessory: Math.min(3, Math.ceil(days / 3)),
   hat: 0,
 });
+
+const shoesCountFor = (days: number): number => {
+  if (days >= 4) return 2;
+  return 1;
+};
+
+const dressCountFor = (days: number): number => {
+  if (days >= 4) return 1;
+  return 0;
+};
 
 // Categories the full outfit scorer reasons about. Bag / hat / accessory don't
 // participate in scoreOutfit, so we keep the color-match heuristic for those.

@@ -41,8 +41,11 @@ const valuesByCurrencyFor = (items: Item[]): CurrencyTotal[] => {
     if (item.price === null) continue;
     const currency = currencyOrUnknown(item.currency);
     const current = totals.get(currency);
-    const next = current === undefined ? item.price : current + item.price;
-    totals.set(currency, next);
+    if (current === undefined) {
+      totals.set(currency, item.price);
+      continue;
+    }
+    totals.set(currency, current + item.price);
   }
   return Array.from(totals.entries())
     .map(([currency, total]) => ({ currency, total }))

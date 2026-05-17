@@ -56,8 +56,13 @@ const buildEntry = (wear: WearRow, itemsByOutfit: Map<string, string[]>): WearEn
     outfitId: wear.outfit_id,
     weather: parseWeather(wear.weather),
     affinityDelta: wear.affinity_delta,
-    itemIds: itemIds === undefined ? [] : itemIds,
+    itemIds: idsOrEmpty(itemIds),
   };
+};
+
+const idsOrEmpty = (itemIds: string[] | undefined): string[] => {
+  if (itemIds === undefined) return [];
+  return itemIds;
 };
 
 const fetchWears = async (userId: string, limit: number): Promise<WearRow[]> => {

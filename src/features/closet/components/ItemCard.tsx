@@ -25,22 +25,26 @@ type Props = {
 const aspect = { sm: 1, md: 1, lg: 1 };
 
 export function ItemCard({ item, onPress, selected, size = "md" }: Props) {
+  const previewUri = previewImageUri(item);
+  const displayLabel = labelFor(item);
+  const showLabel = displayLabel !== null || item.colors[0] !== undefined;
+
   return (
     <Pressable
       onPress={onPress}
       className={cn(
         "rounded-lg overflow-hidden bg-white dark:bg-[#1a1816] border",
-        selected ? "border-ink dark:border-ink-dark" : "border-line dark:border-line-dark"
+        cardBorderClass(selected),
       )}
       style={{ aspectRatio: aspect[size] }}
     >
       <Image
-        source={{ uri: item.thumb_url ?? item.photo_url }}
+        source={{ uri: previewUri }}
         style={{ flex: 1 }}
         contentFit="cover"
         transition={150}
       />
-      {(item.name || item.colors[0]) && (
+      {showLabel && (
         <View className="absolute bottom-0 left-0 right-0 px-2 py-1.5 bg-canvas/85 dark:bg-canvas-dark/85 flex-row items-center gap-2">
           {item.colors[0] && (
             <View
@@ -49,10 +53,33 @@ export function ItemCard({ item, onPress, selected, size = "md" }: Props) {
             />
           )}
           <Text variant="caption" numberOfLines={1} className="flex-1">
-            {item.name ?? CATEGORY_FALLBACK[item.category]}
+            {captionLabel(displayLabel, item.category)}
           </Text>
         </View>
       )}
     </Pressable>
   );
 }
+
+const cardBorderClass = (selected: boolean | undefined): string => {
+  if (selected) return "border-ink dark:border-ink-dark";
+  return "border-line dark:border-line-dark";
+};
+
+const previewImageUri = (item: Item): string => {
+  if (item.thumb_url) return item.thumb_url;
+  return item.photo_url;
+};
+
+const labelFor = (item: Item): string | null => {
+  if (item.name) return item.name;
+  return null;
+};
+
+const captionLabel = (
+  displayLabel: string | null,
+  category: Category,
+): string => {
+  if (displayLabel !== null) return displayLabel;
+  return CATEGORY_FALLBACK[category];
+};

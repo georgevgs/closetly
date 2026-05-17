@@ -19,16 +19,16 @@ export async function analyzeItemFromUri(uri: string): Promise<VisionAttrs> {
 // suppress background leakage.
 export function attrsFromMaskedColors(hexes: string[]): VisionAttrs {
   const seen = new Set<string>();
-  const out: { hex: string }[] = [];
+  const colors: { hex: string }[] = [];
   for (const hex of hexes) {
     if (!/^#[0-9a-fA-F]{6}$/.test(hex)) continue;
     const lower = hex.toLowerCase();
     if (seen.has(lower)) continue;
     seen.add(lower);
-    out.push({ hex: lower });
-    if (out.length >= 3) break;
+    colors.push({ hex: lower });
+    if (colors.length >= 3) break;
   }
-  return { colors: out };
+  return { colors };
 }
 
 function candidateHexes(result: ImageColorsResult): string[] {
@@ -51,22 +51,24 @@ function candidateHexes(result: ImageColorsResult): string[] {
   ].filter(isHex);
 }
 
+type RankedColor = { hex: string; score: number };
+
 function rankGarmentColors(hexes: string[]): string[] {
   const seen = new Set<string>();
-  const ranked: { hex: string; score: number }[] = [];
-  for (let i = 0; i < hexes.length; i++) {
-    const hex = hexes[i].toLowerCase();
+  const ranked: RankedColor[] = [];
+  for (let candidateIndex = 0; candidateIndex < hexes.length; candidateIndex++) {
+    const hex = hexes[candidateIndex].toLowerCase();
     if (seen.has(hex)) continue;
     seen.add(hex);
     const hsl = hexToHsl(hex);
-    let score = 100 - i * 5;
+    let score = 100 - candidateIndex * 5;
     if (isLight(hsl) && isNeutral(hsl)) score -= 30;
     ranked.push({ hex, score });
   }
   return ranked
-    .sort((a, b) => b.score - a.score)
+    .sort((first, second) => second.score - first.score)
     .slice(0, 3)
-    .map((r) => r.hex);
+    .map((entry) => entry.hex);
 }
 
 function isHex(value: unknown): value is string {
@@ -78,8 +80,11 @@ export function visionColorsToItemColors(
 ): ItemColor[] {
   return visionColors
     .slice(0, 3)
-    .filter((c) => /^#[0-9a-fA-F]{6}$/.test(c.hex))
-    .map((c) => ({ hex: c.hex.toLowerCase(), hsl: hexToHsl(c.hex) }));
+    .filter((visionColor) => /^#[0-9a-fA-F]{6}$/.test(visionColor.hex))
+    .map((visionColor) => ({
+      hex: visionColor.hex.toLowerCase(),
+      hsl: hexToHsl(visionColor.hex),
+    }));
 }
 
 // Coverage of the foreground subject within its bounding box is a coarse

@@ -13,8 +13,9 @@ import { Pill } from "~/components/ui/Pill";
 import { GlassSurface } from "~/components/ui/GlassSurface";
 import { useItem, useDeleteItem } from "~/features/closet/hooks/useItems";
 import { useMarkWashed } from "~/features/closet/hooks/useMarkWashed";
-import { signItemUrls } from "~/features/closet/mapper";
+import { signFirst } from "~/features/closet/itemPicker";
 import { useQuery } from "@tanstack/react-query";
+import { foregroundFor } from "~/lib/utils";
 import type { Item } from "~/types/items";
 
 export default function ItemDetail() {
@@ -23,15 +24,15 @@ export default function ItemDetail() {
   const del = useDeleteItem();
   const markWashed = useMarkWashed();
   const { colorScheme } = useColorScheme();
-  const fg = colorScheme === "dark" ? "#f5f3ef" : "#1a1a1a";
+  const foreground = foregroundFor(colorScheme);
 
   const { data: signed } = useQuery({
     queryKey: ["item-signed", item?.id],
     enabled: !!item,
-    queryFn: async () => (item ? (await signItemUrls([item]))[0] : null),
+    queryFn: async () => signFirst(item),
   });
 
-  const display = signed ?? item;
+  const display = displayItem(signed, item);
 
   if (isLoading) {
     return (
@@ -52,37 +53,12 @@ export default function ItemDetail() {
     <Screen edges={["bottom"]}>
       <Stack.Screen
         options={{
-          title: display.name ?? "Item",
+          title: titleFor(display),
           headerRight: () => (
-            <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push(`/items/edit/${display.id}`);
-              }}
-              hitSlop={12}
-              accessibilityLabel="Edit item"
-              accessibilityRole="button"
-            >
-              <GlassSurface
-                isInteractive
-                style={{
-                  height: 36,
-                  width: 36,
-                  borderRadius: 18,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  overflow: "hidden",
-                }}
-                fallbackClassName="bg-canvas/70 dark:bg-canvas-dark/70 border border-line/60 dark:border-line-dark/60"
-              >
-                <SymbolView
-                  name="square.and.pencil"
-                  size={17}
-                  tintColor={fg}
-                  weight="semibold"
-                />
-              </GlassSurface>
-            </Pressable>
+            <EditItemHeaderButton
+              itemId={display.id}
+              foreground={foreground}
+            />
           ),
         }}
       />
@@ -96,7 +72,7 @@ export default function ItemDetail() {
             {display.category}
           </Text>
           <Text variant="title" className="mt-0.5">
-            {display.name ?? "Unnamed"}
+            {nameOrFallback(display.name)}
           </Text>
         </View>
 
@@ -228,6 +204,65 @@ function CareSection({
     </View>
   );
 }
+
+function EditItemHeaderButton({
+  itemId,
+  foreground,
+}: {
+  itemId: string;
+  foreground: string;
+}) {
+  return (
+    <Pressable
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        router.push(`/items/edit/${itemId}`);
+      }}
+      hitSlop={12}
+      accessibilityLabel="Edit item"
+      accessibilityRole="button"
+    >
+      <GlassSurface
+        isInteractive
+        style={{
+          height: 36,
+          width: 36,
+          borderRadius: 18,
+          alignItems: "center",
+          justifyContent: "center",
+          overflow: "hidden",
+        }}
+        fallbackClassName="bg-canvas/70 dark:bg-canvas-dark/70 border border-line/60 dark:border-line-dark/60"
+      >
+        <SymbolView
+          name="square.and.pencil"
+          size={17}
+          tintColor={foreground}
+          weight="semibold"
+        />
+      </GlassSurface>
+    </Pressable>
+  );
+}
+
+const displayItem = (
+  signed: Item | null | undefined,
+  fallback: Item | null | undefined,
+): Item | undefined => {
+  if (signed) return signed;
+  if (fallback) return fallback;
+  return undefined;
+};
+
+const titleFor = (item: Item): string => {
+  if (item.name) return item.name;
+  return "Item";
+};
+
+const nameOrFallback = (name: string | null): string => {
+  if (name === null) return "Unnamed";
+  return name;
+};
 
 const formatPrice = (price: number, currency: string | null): string => {
   const fixed = price.toFixed(2);

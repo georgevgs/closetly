@@ -10,26 +10,33 @@ type Props = {
 };
 
 export function Pill({ label, selected, onPress, className }: Props) {
-  const Wrap = onPress ? Pressable : View;
+  const containerClass = cn(
+    "px-3 py-1.5 rounded-full border",
+    containerSelectionClass(selected),
+    className,
+  );
+  const labelClass = cn("text-sm", labelSelectionClass(selected));
+
+  if (onPress) {
+    return (
+      <Pressable onPress={onPress} className={containerClass}>
+        <Text className={labelClass}>{label}</Text>
+      </Pressable>
+    );
+  }
   return (
-    <Wrap
-      onPress={onPress}
-      className={cn(
-        "px-3 py-1.5 rounded-full border",
-        selected
-          ? "bg-ink dark:bg-ink-dark border-ink dark:border-ink-dark"
-          : "bg-transparent border-line dark:border-line-dark",
-        className
-      )}
-    >
-      <Text
-        className={cn(
-          "text-sm",
-          selected ? "text-canvas dark:text-canvas-dark" : "text-ink dark:text-ink-dark"
-        )}
-      >
-        {label}
-      </Text>
-    </Wrap>
+    <View className={containerClass}>
+      <Text className={labelClass}>{label}</Text>
+    </View>
   );
 }
+
+const containerSelectionClass = (selected: boolean | undefined): string => {
+  if (selected) return "bg-ink dark:bg-ink-dark border-ink dark:border-ink-dark";
+  return "bg-transparent border-line dark:border-line-dark";
+};
+
+const labelSelectionClass = (selected: boolean | undefined): string => {
+  if (selected) return "text-canvas dark:text-canvas-dark";
+  return "text-ink dark:text-ink-dark";
+};

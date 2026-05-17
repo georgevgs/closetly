@@ -13,13 +13,18 @@ import { useWeather, type WeatherSnapshot } from "~/features/weather/useWeather"
 import { useAuth } from "~/features/auth/context";
 import { usePairAffinity } from "~/features/outfits/hooks/usePairAffinity";
 import { useRecentWears } from "~/features/wear/hooks/useRecentWears";
+import { useItemWearCounts } from "~/features/wear/hooks/useItemWearCounts";
+import {
+  usePreferredStyles,
+  preferredStylesAsSet,
+} from "~/features/profile/stylePreferences";
 import { TodayOutfitsSection } from "~/features/outfits/components/TodayOutfitsSection";
 import { LocationPrompt } from "~/features/weather/components/LocationPrompt";
 import {
   assessClosetViability,
   type ClosetViability,
 } from "~/lib/outfit/closetViability";
-import type { Item, Category } from "~/types/items";
+import type { Item, Category, Style } from "~/types/items";
 
 const ANCHOR_PRIORITY: Category[] = ["bottom", "outerwear", "dress", "top", "shoes"];
 
@@ -40,6 +45,12 @@ export default function TodayScreen() {
   const { data: weather } = useWeather();
   const { data: pairAffinity } = usePairAffinity(session?.user.id);
   const { data: recentlyWornItemIds } = useRecentWears(session?.user.id);
+  const { data: itemWearCounts } = useItemWearCounts(session?.user.id);
+  const preferredStylesList = usePreferredStyles();
+  const preferredStyles = useMemo(
+    () => preferredStylesAsSet(preferredStylesList),
+    [preferredStylesList],
+  );
 
   const anchorCandidates = useMemo(() => {
     if (!items) return [];
@@ -63,6 +74,8 @@ export default function TodayScreen() {
           weather={weather}
           pairAffinity={pairAffinity}
           recentlyWornItemIds={recentlyWornItemIds}
+          preferredStyles={preferredStyles}
+          itemWearCounts={itemWearCounts}
         />
       </ScrollView>
     </Screen>
@@ -90,6 +103,8 @@ function HomeBody({
   weather,
   pairAffinity,
   recentlyWornItemIds,
+  preferredStyles,
+  itemWearCounts,
 }: {
   isLoading: boolean;
   viability: ClosetViability | null;
@@ -97,6 +112,8 @@ function HomeBody({
   weather: WeatherSnapshot | null | undefined;
   pairAffinity: Map<string, number> | undefined;
   recentlyWornItemIds: Map<string, number> | undefined;
+  preferredStyles: ReadonlySet<Style>;
+  itemWearCounts: Map<string, number> | undefined;
 }) {
   if (isLoading) return <LoadingState />;
   if (!viability) return <LoadingState />;
@@ -108,6 +125,8 @@ function HomeBody({
       weather={weather}
       pairAffinity={pairAffinity}
       recentlyWornItemIds={recentlyWornItemIds}
+      preferredStyles={preferredStyles}
+      itemWearCounts={itemWearCounts}
     />
   );
 }
@@ -125,11 +144,15 @@ function ReadyState({
   weather,
   pairAffinity,
   recentlyWornItemIds,
+  preferredStyles,
+  itemWearCounts,
 }: {
   anchorCandidates: Item[];
   weather: WeatherSnapshot | null | undefined;
   pairAffinity: Map<string, number> | undefined;
   recentlyWornItemIds: Map<string, number> | undefined;
+  preferredStyles: ReadonlySet<Style>;
+  itemWearCounts: Map<string, number> | undefined;
 }) {
   return (
     <>
@@ -138,6 +161,8 @@ function ReadyState({
         weather={weather}
         pairAffinity={pairAffinity}
         recentlyWornItemIds={recentlyWornItemIds}
+        preferredStyles={preferredStyles}
+        itemWearCounts={itemWearCounts}
       />
       <BuildOutfitPrompt />
       <Section

@@ -20,9 +20,14 @@ export type SavedTrip = {
   createdAt: string;
 };
 
+const tripListKey = (userId: string | undefined) => {
+  if (userId) return tripKeys.list(userId);
+  return tripKeys.noop;
+};
+
 export const useTrips = (userId: string | undefined) => {
   return useQuery({
-    queryKey: userId ? tripKeys.list(userId) : ["trips", "noop"],
+    queryKey: tripListKey(userId),
     enabled: Boolean(userId),
     queryFn: async (): Promise<SavedTrip[]> => {
       const trips = await fetchTrips(userId!);
@@ -181,7 +186,12 @@ const buildSavedTrip = (
   itemsByTrip: Map<string, string[]>,
 ): SavedTrip => {
   const itemIds = itemsByTrip.get(trip.id);
-  return tripRowToSaved(trip, itemIds === undefined ? [] : itemIds);
+  return tripRowToSaved(trip, idsOrEmpty(itemIds));
+};
+
+const idsOrEmpty = (itemIds: string[] | undefined): string[] => {
+  if (itemIds === undefined) return [];
+  return itemIds;
 };
 
 const tripRowToSaved = (trip: TripRow, itemIds: string[]): SavedTrip => {

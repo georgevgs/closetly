@@ -1,4 +1,3 @@
-import "react-native-gesture-handler";
 import "react-native-reanimated";
 import "../global.css";
 
@@ -16,6 +15,7 @@ import { ThemeProvider } from "~/providers/ThemeProvider";
 import { CategoryPrefsProvider } from "~/providers/CategoryPrefsProvider";
 import { AuthProvider, useAuth } from "~/features/auth/context";
 import { OnboardingProvider, useOnboarding } from "~/features/onboarding/context";
+import { toasterThemeFor } from "~/lib/utils";
 
 export const unstable_settings = {
   initialRouteName: "(app)",
@@ -104,7 +104,7 @@ export default function RootLayout() {
                 <OnboardingProvider>
                   <BottomSheetModalProvider>
                     <AuthGate />
-                    <Toaster theme={colorScheme === "dark" ? "dark" : "light"} position="top-center" />
+                    <Toaster theme={toasterThemeFor(colorScheme)} position="top-center" />
                     <StatusBar style="auto" />
                   </BottomSheetModalProvider>
                 </OnboardingProvider>

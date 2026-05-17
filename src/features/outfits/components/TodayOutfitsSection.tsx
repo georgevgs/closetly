@@ -1,12 +1,11 @@
-import { useEffect, useState } from "react";
-import { ActivityIndicator, InteractionManager, View } from "react-native";
+import { ActivityIndicator, View } from "react-native";
 import { Section } from "~/components/ui/Section";
 import { SuggestionsList } from "./SuggestionsList";
 import { useOutfitActions } from "~/features/outfits/hooks/useOutfitActions";
+import { useDeferredSuggestions } from "~/features/outfits/hooks/useDeferredSuggestions";
 import { toWeatherContext } from "~/features/outfits/weatherContext";
 import { suggestTodayOutfits } from "~/lib/outfit/today";
-import type { OutfitSuggestion } from "~/lib/outfit/combinator";
-import type { Item } from "~/types/items";
+import type { Item, Style } from "~/types/items";
 import type { WeatherSnapshot } from "~/features/weather/useWeather";
 
 const TODAY_OUTFIT_COUNT = 3;
@@ -16,19 +15,22 @@ export function TodayOutfitsSection({
   weather,
   pairAffinity,
   recentlyWornItemIds,
+  preferredStyles,
+  itemWearCounts,
 }: {
   items: Item[];
   weather: WeatherSnapshot | null | undefined;
   pairAffinity?: Map<string, number>;
   recentlyWornItemIds?: Map<string, number>;
+  preferredStyles?: ReadonlySet<Style>;
+  itemWearCounts?: Map<string, number>;
 }) {
   const actions = useOutfitActions(weather);
-  const { suggestions, isComputing } = useDeferredTodaySuggestions({
-    items,
-    weather,
-    pairAffinity,
-    recentlyWornItemIds,
-  });
+  const { suggestions, isComputing } = useDeferredSuggestions(
+    { items, weather, pairAffinity, recentlyWornItemIds, preferredStyles, itemWearCounts },
+    computeTodaySuggestions,
+    [items, weather, pairAffinity, recentlyWornItemIds, preferredStyles, itemWearCounts],
+  );
 
   if (isComputing) return <ComputingPlaceholder />;
   if (suggestions.length === 0) return null;
@@ -60,45 +62,25 @@ function ComputingPlaceholder() {
   );
 }
 
-// Scoring runs hundreds of combinations per anchor. We defer it to after the
-// current interaction so navigation/scroll stays at 60fps; cancellation guards
-// against stale results landing if inputs change mid-compute.
-const useDeferredTodaySuggestions = ({
-  items,
-  weather,
-  pairAffinity,
-  recentlyWornItemIds,
-}: {
+type TodaySuggestionInputs = {
   items: Item[];
   weather: WeatherSnapshot | null | undefined;
   pairAffinity: Map<string, number> | undefined;
   recentlyWornItemIds: Map<string, number> | undefined;
-}): { suggestions: OutfitSuggestion[]; isComputing: boolean } => {
-  const [suggestions, setSuggestions] = useState<OutfitSuggestion[]>([]);
-  const [isComputing, setIsComputing] = useState(true);
+  preferredStyles: ReadonlySet<Style> | undefined;
+  itemWearCounts: Map<string, number> | undefined;
+};
 
-  useEffect(() => {
-    setIsComputing(true);
-    let cancelled = false;
-    const handle = InteractionManager.runAfterInteractions(() => {
-      if (cancelled) return;
-      const computed = suggestTodayOutfits({
-        closet: items,
-        weather: toWeatherContext(weather),
-        pairAffinity,
-        recentlyWornItemIds,
-        count: TODAY_OUTFIT_COUNT,
-      });
-      setSuggestions(computed);
-      setIsComputing(false);
-    });
-    return () => {
-      cancelled = true;
-      handle.cancel();
-    };
-  }, [items, weather, pairAffinity, recentlyWornItemIds]);
-
-  return { suggestions, isComputing };
+const computeTodaySuggestions = (inputs: TodaySuggestionInputs) => {
+  return suggestTodayOutfits({
+    closet: inputs.items,
+    weather: toWeatherContext(inputs.weather),
+    pairAffinity: inputs.pairAffinity,
+    recentlyWornItemIds: inputs.recentlyWornItemIds,
+    preferredStyles: inputs.preferredStyles,
+    itemWearCounts: inputs.itemWearCounts,
+    count: TODAY_OUTFIT_COUNT,
+  });
 };
 
 const subtitleFor = (weather: WeatherSnapshot | null | undefined): string => {

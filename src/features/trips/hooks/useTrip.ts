@@ -26,11 +26,17 @@ export const tripKeys = {
   all: ["trips"] as const,
   list: (userId: string) => ["trips", "list", userId] as const,
   detail: (tripId: string) => ["trips", "detail", tripId] as const,
+  noop: ["trips", "noop"] as const,
+};
+
+const tripDetailKey = (tripId: string | undefined) => {
+  if (tripId) return tripKeys.detail(tripId);
+  return tripKeys.noop;
 };
 
 export const useTrip = (tripId: string | undefined) => {
   return useQuery<TripDetail | null>({
-    queryKey: tripId ? tripKeys.detail(tripId) : ["trips", "noop"],
+    queryKey: tripDetailKey(tripId),
     enabled: Boolean(tripId),
     queryFn: async () => {
       if (!tripId) return null;

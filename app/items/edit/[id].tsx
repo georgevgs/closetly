@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { View, ScrollView, TextInput, ActivityIndicator, Pressable } from "react-native";
 import { Image } from "expo-image";
-import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner-native";
@@ -10,10 +9,13 @@ import { Screen } from "~/components/ui/Screen";
 import { Text } from "~/components/ui/Text";
 import { Button } from "~/components/ui/Button";
 import { Pill } from "~/components/ui/Pill";
+import { Disclosure } from "~/components/ui/Disclosure";
+import { KeyboardAvoider } from "~/components/ui/KeyboardAvoider";
 import { Section } from "~/features/closet/components/Section";
 import { ItemFormBar } from "~/features/closet/components/ItemFormBar";
+import { ItemAttributesForm } from "~/features/closet/components/ItemAttributesForm";
 import { useItem, useUpdateItem, useReplaceItemPhoto } from "~/features/closet/hooks/useItems";
-import { signItemUrls } from "~/features/closet/mapper";
+import { launchPicker, signFirst, type PickerSource } from "~/features/closet/itemPicker";
 import { seasonsForWarmth } from "~/lib/seasons";
 import { ensureCameraPermission } from "~/lib/permissions";
 import { isBgRemovalAvailable, removeBackground } from "expo-bg-remover";
@@ -25,10 +27,6 @@ import {
   parsePurchasedOnInput,
 } from "~/features/closet/itemFormParsers";
 import {
-  STYLES,
-  SEASONS,
-  PATTERNS,
-  OCCASIONS,
   type Category,
   type Style,
   type Season,
@@ -40,7 +38,6 @@ import {
 } from "~/types/items";
 
 type Fit = Silhouette["fit"];
-const FITS: Fit[] = ["slim", "regular", "relaxed", "oversized"];
 
 export default function EditItemScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -52,9 +49,9 @@ export default function EditItemScreen() {
   const { data: signed } = useQuery({
     queryKey: ["item-signed", item?.id],
     enabled: !!item,
-    queryFn: async () => (item ? (await signItemUrls([item]))[0] : null),
+    queryFn: async () => signFirst(item),
   });
-  const photoUrl = signed?.photo_url ?? item?.photo_url;
+  const photoUrl = pickPhotoUrl(signed, item);
 
   const [name, setName] = useState("");
   const [category, setCategory] = useState<Category>("top");
@@ -95,33 +92,13 @@ export default function EditItemScreen() {
     );
   }
 
-  function toggle<T>(set: Set<T>, value: T, setter: (s: Set<T>) => void) {
-    const next = new Set(set);
-    if (next.has(value)) next.delete(value);
-    else next.add(value);
-    setter(next);
-  }
-
-  async function pickReplacement(source: "camera" | "library") {
+  async function pickReplacement(source: PickerSource) {
     if (!item) return;
     if (source === "camera") {
       const granted = await ensureCameraPermission();
       if (!granted) return;
     }
-    const result =
-      source === "camera"
-        ? await ImagePicker.launchCameraAsync({
-            mediaTypes: ["images"],
-            quality: 0.9,
-            allowsEditing: true,
-            aspect: [1, 1],
-          })
-        : await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ["images"],
-            quality: 0.9,
-            allowsEditing: true,
-            aspect: [1, 1],
-          });
+    const result = await launchPicker(source);
     if (result.canceled) return;
     const original = result.assets[0].uri;
     let photoUri = original;
@@ -180,21 +157,23 @@ export default function EditItemScreen() {
     setFit(option);
   };
 
-  const categoryOptions = visibleCategories.includes(category)
-    ? visibleCategories
-    : [category, ...visibleCategories];
+  const categoryOptions = categoryOptionsFor(category, visibleCategories);
 
   return (
     <Screen edges={["bottom"]}>
-      <ScrollView contentContainerStyle={{ padding: 20, gap: 24, paddingBottom: 60 }}>
+      <KeyboardAvoider className="flex-1">
+      <ScrollView
+        contentContainerStyle={{ padding: 20, gap: 24, paddingBottom: 60 }}
+        keyboardShouldPersistTaps="handled"
+      >
         <View>
           <View
             className="rounded-xl overflow-hidden bg-line dark:bg-line-dark"
             style={{ aspectRatio: 1 }}
           >
-            {photoUrl ? (
+            {photoUrl && (
               <Image source={{ uri: photoUrl }} style={{ flex: 1 }} contentFit="cover" />
-            ) : null}
+            )}
             {replacePhoto.isPending && (
               <View className="absolute inset-0 items-center justify-center bg-black/30">
                 <ActivityIndicator color="#fff" />
@@ -235,149 +214,51 @@ export default function EditItemScreen() {
 
         <Section title="Category">
           <View className="flex-row flex-wrap gap-2">
-            {categoryOptions.map((c) => (
+            {categoryOptions.map((categoryOption) => (
               <Pill
-                key={c}
-                label={c}
-                selected={category === c}
-                onPress={() => setCategory(c)}
+                key={categoryOption}
+                label={categoryOption}
+                selected={category === categoryOption}
+                onPress={() => setCategory(categoryOption)}
               />
             ))}
           </View>
         </Section>
 
-        <Section title="Style" subtitle="Pick all that apply">
-          <View className="flex-row flex-wrap gap-2">
-            {STYLES.map((s) => (
-              <Pill
-                key={s}
-                label={s}
-                selected={styles.has(s)}
-                onPress={() => toggle(styles, s, setStyles)}
-              />
-            ))}
-          </View>
-        </Section>
-
-        <Section title="Pattern">
-          <View className="flex-row flex-wrap gap-2">
-            {PATTERNS.map((p) => (
-              <Pill
-                key={p}
-                label={p}
-                selected={pattern === p}
-                onPress={() => setPattern(p)}
-              />
-            ))}
-          </View>
-        </Section>
-
-        <Section title="Seasons">
-          <View className="flex-row flex-wrap gap-2">
-            {SEASONS.map((s) => (
-              <Pill
-                key={s}
-                label={s}
-                selected={seasons.has(s)}
-                onPress={() => toggle(seasons, s, setSeasons)}
-              />
-            ))}
-          </View>
-          <Pressable
-            onPress={() => setSeasons(new Set(seasonsForWarmth(warmth)))}
-            hitSlop={8}
-            className="mt-2 self-start"
-          >
-            <Text variant="caption" className="underline">
-              Use warmth defaults ({warmthLabel(warmth)})
-            </Text>
-          </Pressable>
-        </Section>
-
-        <Section title="Formality" subtitle="1 = loungewear · 5 = black tie">
-          <View className="flex-row gap-2">
-            {[1, 2, 3, 4, 5].map((n) => (
-              <Pill
-                key={n}
-                label={String(n)}
-                selected={formality === n}
-                onPress={() => setFormality(n as Formality)}
-              />
-            ))}
-          </View>
-        </Section>
-
-        <Section title="Warmth" subtitle="0 = bare · 4 = parka">
-          <View className="flex-row gap-2">
-            {[0, 1, 2, 3, 4].map((n) => (
-              <Pill
-                key={n}
-                label={String(n)}
-                selected={warmth === n}
-                onPress={() => setWarmth(n as Warmth)}
-              />
-            ))}
-          </View>
-        </Section>
-
-        <Section title="Fit" subtitle="How does it sit on the body? Tap again to clear.">
-          <View className="flex-row flex-wrap gap-2">
-            {FITS.map((option) => (
-              <Pill
-                key={option}
-                label={option}
-                selected={fit === option}
-                onPress={() => handleFitTap(option)}
-              />
-            ))}
-          </View>
-        </Section>
-
-        <Section title="Occasions" subtitle="Optional — when you'd reach for this piece">
-          <View className="flex-row flex-wrap gap-2">
-            {OCCASIONS.map((occasion) => (
-              <Pill
-                key={occasion}
-                label={occasion}
-                selected={occasions.has(occasion)}
-                onPress={() => toggle(occasions, occasion, setOccasions)}
-              />
-            ))}
-          </View>
-        </Section>
-
-        <Section title="Price" subtitle="Optional — used for cost-per-wear">
-          <View className="flex-row gap-2">
-            <TextInput
-              value={priceText}
-              onChangeText={setPriceText}
-              keyboardType="decimal-pad"
-              placeholder="0.00"
-              placeholderTextColor="#a8a29e"
-              className="flex-1 h-12 px-4 rounded-lg border border-line dark:border-line-dark text-ink dark:text-ink-dark"
-            />
-            <TextInput
-              value={currencyText}
-              onChangeText={setCurrencyText}
-              autoCapitalize="characters"
-              maxLength={3}
-              placeholder="USD"
-              placeholderTextColor="#a8a29e"
-              className="w-24 h-12 px-4 rounded-lg border border-line dark:border-line-dark text-ink dark:text-ink-dark"
-            />
-          </View>
-        </Section>
-
-        <Section title="Purchased on" subtitle="Optional — YYYY-MM-DD">
-          <TextInput
-            value={purchasedOnText}
-            onChangeText={setPurchasedOnText}
-            placeholder="2026-05-10"
-            placeholderTextColor="#a8a29e"
-            keyboardType="numbers-and-punctuation"
-            className="h-12 px-4 rounded-lg border border-line dark:border-line-dark text-ink dark:text-ink-dark"
+        <Disclosure
+          title="More details"
+          subtitle="Style, fit, seasons, occasions, price"
+        >
+          <ItemAttributesForm
+            styles={styles}
+            onChangeStyles={setStyles}
+            pattern={pattern}
+            onChangePattern={setPattern}
+            seasons={seasons}
+            onChangeSeasons={setSeasons}
+            seasonsConfig={{
+              accessory: (
+                <WarmthDefaultsButton
+                  warmth={warmth}
+                  onApply={() => setSeasons(new Set(seasonsForWarmth(warmth)))}
+                />
+              ),
+            }}
+            formality={formality}
+            onChangeFormality={setFormality}
+            warmth={warmth}
+            onChangeWarmth={setWarmth}
+            occasions={occasions}
+            onChangeOccasions={setOccasions}
+            fit={{ value: fit, onTap: handleFitTap }}
+            priceText={priceText}
+            onChangePriceText={setPriceText}
+            currencyText={currencyText}
+            onChangeCurrencyText={setCurrencyText}
+            purchasedOnText={purchasedOnText}
+            onChangePurchasedOnText={setPurchasedOnText}
           />
-        </Section>
+        </Disclosure>
 
       </ScrollView>
       <ItemFormBar
@@ -386,7 +267,41 @@ export default function EditItemScreen() {
         saving={update.isPending}
         hint={null}
       />
+      </KeyboardAvoider>
     </Screen>
+  );
+}
+
+const pickPhotoUrl = (
+  signed: { photo_url: string } | null | undefined,
+  fallback: { photo_url: string } | null | undefined,
+): string | undefined => {
+  if (signed?.photo_url) return signed.photo_url;
+  if (fallback?.photo_url) return fallback.photo_url;
+  return undefined;
+};
+
+const categoryOptionsFor = (
+  current: Category,
+  visible: readonly Category[],
+): Category[] => {
+  if (visible.includes(current)) return [...visible];
+  return [current, ...visible];
+};
+
+function WarmthDefaultsButton({
+  warmth,
+  onApply,
+}: {
+  warmth: Warmth;
+  onApply: () => void;
+}) {
+  return (
+    <Pressable onPress={onApply} hitSlop={8} className="mt-2 self-start">
+      <Text variant="caption" className="underline">
+        Use warmth defaults ({warmthLabel(warmth)})
+      </Text>
+    </Pressable>
   );
 }
 

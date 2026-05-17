@@ -12,6 +12,7 @@ import { useSetAllTripItemsPacked } from "~/features/trips/hooks/useSetAllTripIt
 import { useDeleteTrip } from "~/features/trips/hooks/useTrips";
 import { PackingList } from "~/features/trips/components/PackingList";
 import { parseDateOnly } from "~/lib/dates";
+import { foregroundFor } from "~/lib/utils";
 
 export default function TripDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -20,7 +21,7 @@ export default function TripDetailScreen() {
   const setAllPacked = useSetAllTripItemsPacked();
   const deleteTrip = useDeleteTrip();
   const { colorScheme } = useColorScheme();
-  const fg = colorScheme === "dark" ? "#f5f3ef" : "#1a1a1a";
+  const foreground = foregroundFor(colorScheme);
 
   if (isLoading) {
     return (
@@ -73,8 +74,8 @@ export default function TripDetailScreen() {
           title: trip.name,
           headerRight: () => (
             <View className="flex-row items-center" style={{ gap: 6 }}>
-              <EditHeaderButton fg={fg} onPress={() => openEditTrip(trip.id)} />
-              <DeleteHeaderButton fg={fg} onPress={handleDelete} />
+              <EditHeaderButton foreground={foreground} onPress={() => openEditTrip(trip.id)} />
+              <DeleteHeaderButton foreground={foreground} onPress={handleDelete} />
             </View>
           ),
         }}
@@ -92,39 +93,47 @@ export default function TripDetailScreen() {
   );
 }
 
-function EditHeaderButton({ fg, onPress }: { fg: string; onPress: () => void }) {
+type HeaderButtonProps = { foreground: string; onPress: () => void };
+
+function EditHeaderButton({ foreground, onPress }: HeaderButtonProps) {
   return (
-    <Pressable
+    <HeaderIconButton
+      symbol="square.and.pencil"
+      foreground={foreground}
       onPress={onPress}
-      hitSlop={12}
-      accessibilityRole="button"
       accessibilityLabel="Edit trip"
-    >
-      <GlassSurface
-        isInteractive
-        style={{
-          height: 36,
-          width: 36,
-          borderRadius: 18,
-          alignItems: "center",
-          justifyContent: "center",
-          overflow: "hidden",
-        }}
-        fallbackClassName="bg-canvas/70 dark:bg-canvas-dark/70 border border-line/60 dark:border-line-dark/60"
-      >
-        <SymbolView name="square.and.pencil" size={16} tintColor={fg} weight="semibold" />
-      </GlassSurface>
-    </Pressable>
+    />
   );
 }
 
-function DeleteHeaderButton({ fg, onPress }: { fg: string; onPress: () => void }) {
+function DeleteHeaderButton({ foreground, onPress }: HeaderButtonProps) {
+  return (
+    <HeaderIconButton
+      symbol="trash"
+      foreground={foreground}
+      onPress={onPress}
+      accessibilityLabel="Delete trip"
+    />
+  );
+}
+
+function HeaderIconButton({
+  symbol,
+  foreground,
+  onPress,
+  accessibilityLabel,
+}: {
+  symbol: Parameters<typeof SymbolView>[0]["name"];
+  foreground: string;
+  onPress: () => void;
+  accessibilityLabel: string;
+}) {
   return (
     <Pressable
       onPress={onPress}
       hitSlop={12}
       accessibilityRole="button"
-      accessibilityLabel="Delete trip"
+      accessibilityLabel={accessibilityLabel}
     >
       <GlassSurface
         isInteractive
@@ -138,7 +147,7 @@ function DeleteHeaderButton({ fg, onPress }: { fg: string; onPress: () => void }
         }}
         fallbackClassName="bg-canvas/70 dark:bg-canvas-dark/70 border border-line/60 dark:border-line-dark/60"
       >
-        <SymbolView name="trash" size={16} tintColor={fg} weight="semibold" />
+        <SymbolView name={symbol} size={16} tintColor={foreground} weight="semibold" />
       </GlassSurface>
     </Pressable>
   );
@@ -227,18 +236,34 @@ function BatchPackButton({
 }) {
   if (totalCount === 0) return null;
   const allPacked = packedCount === totalCount;
+  const label = batchPackLabel(allPacked);
+  const handlePress = batchPackHandler(allPacked, onPackAll, onUnpackAll);
   return (
     <Pressable
-      onPress={allPacked ? onUnpackAll : onPackAll}
+      onPress={handlePress}
       hitSlop={8}
       accessibilityRole="button"
-      accessibilityLabel={allPacked ? "Unpack all" : "Pack all"}
+      accessibilityLabel={label}
       className="px-3 py-1.5 rounded-full border border-line dark:border-line-dark"
     >
-      <Text variant="caption">{allPacked ? "Unpack all" : "Pack all"}</Text>
+      <Text variant="caption">{label}</Text>
     </Pressable>
   );
 }
+
+const batchPackLabel = (allPacked: boolean): string => {
+  if (allPacked) return "Unpack all";
+  return "Pack all";
+};
+
+const batchPackHandler = (
+  allPacked: boolean,
+  onPackAll: () => void,
+  onUnpackAll: () => void,
+): (() => void) => {
+  if (allPacked) return onUnpackAll;
+  return onPackAll;
+};
 
 function ProgressBar({ packed, total }: { packed: number; total: number }) {
   return (

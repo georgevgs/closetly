@@ -5,14 +5,14 @@ import { CATEGORIES, type Category } from "~/types/items";
 
 const STORAGE_KEY = "closetly:hiddenCategories";
 
-type Ctx = {
+type CategoryPrefsContextValue = {
   hidden: Set<Category>;
   visible: Category[];
-  toggle: (c: Category) => void;
-  isHidden: (c: Category) => boolean;
+  toggle: (category: Category) => void;
+  isHidden: (category: Category) => boolean;
 };
 
-const CategoryPrefsContext = createContext<Ctx | null>(null);
+const CategoryPrefsContext = createContext<CategoryPrefsContextValue | null>(null);
 
 function isCategory(value: string): value is Category {
   return (CATEGORIES as readonly string[]).includes(value);
@@ -35,19 +35,19 @@ export function CategoryPrefsProvider({ children }: { children: React.ReactNode 
     });
   }, []);
 
-  const value = useMemo<Ctx>(() => {
+  const value = useMemo<CategoryPrefsContextValue>(() => {
     const persist = (next: Set<Category>) => {
       AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([...next]));
     };
     return {
       hidden,
-      visible: CATEGORIES.filter((c) => !hidden.has(c)),
-      isHidden: (c) => hidden.has(c),
-      toggle: (c) => {
-        setHidden((prev) => {
-          const next = new Set(prev);
-          if (next.has(c)) next.delete(c);
-          else next.add(c);
+      visible: CATEGORIES.filter((category) => !hidden.has(category)),
+      isHidden: (category) => hidden.has(category),
+      toggle: (category) => {
+        setHidden((previous) => {
+          const next = new Set(previous);
+          if (next.has(category)) next.delete(category);
+          else next.add(category);
           persist(next);
           return next;
         });
@@ -63,7 +63,9 @@ export function CategoryPrefsProvider({ children }: { children: React.ReactNode 
 }
 
 export function useCategoryPrefs() {
-  const ctx = useContext(CategoryPrefsContext);
-  if (!ctx) throw new Error("useCategoryPrefs must be used inside CategoryPrefsProvider");
-  return ctx;
+  const context = useContext(CategoryPrefsContext);
+  if (!context) {
+    throw new Error("useCategoryPrefs must be used inside CategoryPrefsProvider");
+  }
+  return context;
 }

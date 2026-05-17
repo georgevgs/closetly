@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { ActivityIndicator, InteractionManager, ScrollView, View } from "react-native";
+import { useMemo, useState } from "react";
+import { ActivityIndicator, ScrollView, View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 
 import { Screen } from "~/components/ui/Screen";
@@ -10,15 +10,21 @@ import { useAuth } from "~/features/auth/context";
 import { useSignedItems } from "~/features/closet/hooks/useSignedItems";
 import { usePairAffinity } from "~/features/outfits/hooks/usePairAffinity";
 import { useOutfitActions } from "~/features/outfits/hooks/useOutfitActions";
+import { useDeferredSuggestions } from "~/features/outfits/hooks/useDeferredSuggestions";
 import { useRecentWears } from "~/features/wear/hooks/useRecentWears";
+import { useItemWearCounts } from "~/features/wear/hooks/useItemWearCounts";
+import {
+  usePreferredStyles,
+  preferredStylesAsSet,
+} from "~/features/profile/stylePreferences";
 import { useWeather, type WeatherSnapshot } from "~/features/weather/useWeather";
-import { suggestOutfits, type OutfitSuggestion } from "~/lib/outfit/combinator";
+import { suggestOutfits } from "~/lib/outfit/combinator";
 import {
   SuggestionsList,
   visibleSuggestions,
 } from "~/features/outfits/components/SuggestionsList";
 import { toWeatherContext } from "~/features/outfits/weatherContext";
-import { OCCASIONS, type Item, type Occasion } from "~/types/items";
+import { OCCASIONS, type Item, type Occasion, type Style } from "~/types/items";
 
 const SUGGEST_LIMIT = 8;
 
@@ -28,19 +34,40 @@ export default function SuggestScreen() {
   const { data: items, isLoading } = useSignedItems(session?.user.id);
   const { data: pairAffinity } = usePairAffinity(session?.user.id);
   const { data: recentlyWornItemIds } = useRecentWears(session?.user.id);
+  const { data: itemWearCounts } = useItemWearCounts(session?.user.id);
+  const preferredStylesList = usePreferredStyles();
+  const preferredStyles = useMemo(
+    () => preferredStylesAsSet(preferredStylesList),
+    [preferredStylesList],
+  );
   const { data: weather } = useWeather();
   const actions = useOutfitActions(weather);
   const [targetOccasion, setTargetOccasion] = useState<Occasion | null>(null);
 
   const anchor = items?.find((item) => item.id === anchorId);
-  const { suggestions, isComputing } = useDeferredAnchorSuggestions({
-    anchor,
-    items,
-    weather,
-    pairAffinity,
-    recentlyWornItemIds,
-    targetOccasion,
-  });
+  const { suggestions, isComputing } = useDeferredSuggestions(
+    {
+      anchor,
+      items,
+      weather,
+      pairAffinity,
+      recentlyWornItemIds,
+      preferredStyles,
+      itemWearCounts,
+      targetOccasion,
+    },
+    computeAnchorSuggestions,
+    [
+      anchor,
+      items,
+      weather,
+      pairAffinity,
+      recentlyWornItemIds,
+      preferredStyles,
+      itemWearCounts,
+      targetOccasion,
+    ],
+  );
 
   if (isLoading) {
     return (
@@ -99,9 +126,14 @@ function SuggestionCount({
 }
 
 const suggestionCountLabel = (count: number, occasion: Occasion | null): string => {
-  const noun = count === 1 ? "outfit" : "outfits";
+  const noun = outfitNounFor(count);
   if (occasion === null) return `${count} ${noun}`;
   return `${count} ${noun} for ${occasion}`;
+};
+
+const outfitNounFor = (count: number): string => {
+  if (count === 1) return "outfit";
+  return "outfits";
 };
 
 function AnchorHeader({
@@ -172,56 +204,30 @@ function OccasionPicker({
   );
 }
 
-// Same deferral pattern as the Today screen — the combinator can score
-// hundreds of outfits per anchor and would otherwise stall the navigation
-// transition into this screen.
-const useDeferredAnchorSuggestions = ({
-  anchor,
-  items,
-  weather,
-  pairAffinity,
-  recentlyWornItemIds,
-  targetOccasion,
-}: {
+type AnchorSuggestionInputs = {
   anchor: Item | undefined;
   items: Item[] | undefined;
   weather: WeatherSnapshot | null | undefined;
   pairAffinity: Map<string, number> | undefined;
   recentlyWornItemIds: Map<string, number> | undefined;
+  preferredStyles: ReadonlySet<Style> | undefined;
+  itemWearCounts: Map<string, number> | undefined;
   targetOccasion: Occasion | null;
-}): { suggestions: OutfitSuggestion[]; isComputing: boolean } => {
-  const [suggestions, setSuggestions] = useState<OutfitSuggestion[]>([]);
-  const [isComputing, setIsComputing] = useState(true);
+};
 
-  useEffect(() => {
-    if (!anchor || !items) {
-      setSuggestions([]);
-      setIsComputing(false);
-      return;
-    }
-    setIsComputing(true);
-    let cancelled = false;
-    const handle = InteractionManager.runAfterInteractions(() => {
-      if (cancelled) return;
-      const computed = suggestOutfits({
-        anchor,
-        closet: items,
-        weather: toWeatherContext(weather),
-        pairAffinity,
-        recentlyWornItemIds,
-        targetOccasion: occasionOrUndefined(targetOccasion),
-        limit: SUGGEST_LIMIT,
-      });
-      setSuggestions(computed);
-      setIsComputing(false);
-    });
-    return () => {
-      cancelled = true;
-      handle.cancel();
-    };
-  }, [anchor, items, weather, pairAffinity, recentlyWornItemIds, targetOccasion]);
-
-  return { suggestions, isComputing };
+const computeAnchorSuggestions = (inputs: AnchorSuggestionInputs) => {
+  if (!inputs.anchor || !inputs.items) return [];
+  return suggestOutfits({
+    anchor: inputs.anchor,
+    closet: inputs.items,
+    weather: toWeatherContext(inputs.weather),
+    pairAffinity: inputs.pairAffinity,
+    recentlyWornItemIds: inputs.recentlyWornItemIds,
+    preferredStyles: inputs.preferredStyles,
+    itemWearCounts: inputs.itemWearCounts,
+    targetOccasion: occasionOrUndefined(inputs.targetOccasion),
+    limit: SUGGEST_LIMIT,
+  });
 };
 
 const occasionOrUndefined = (occasion: Occasion | null): Occasion | undefined => {

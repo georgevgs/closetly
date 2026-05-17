@@ -12,7 +12,12 @@ import { WearHistorySection } from "~/features/wear/components/WearHistorySectio
 import { WardrobeStatsSection } from "~/features/wear/components/WardrobeStatsSection";
 import { LegalLinks } from "~/features/legal/components/LegalLinks";
 import { useSuggestionInteractions } from "~/features/outfits/suggestionInteractions";
-import { CATEGORIES } from "~/types/items";
+import {
+  usePreferredStyles,
+  togglePreferredStyle,
+  MAX_PREFERRED_STYLES,
+} from "~/features/profile/stylePreferences";
+import { CATEGORIES, STYLES, type Style } from "~/types/items";
 import { cn } from "~/lib/utils";
 import { handleError } from "~/lib/handleError";
 
@@ -37,7 +42,12 @@ export default function ProfileScreen() {
   const { session } = useAuth();
   const { preference, setPreference } = useThemePreference();
   const { isHidden, toggle, visible } = useCategoryPrefs();
+  const preferredStyles = usePreferredStyles();
   const [signingOut, setSigningOut] = useState(false);
+
+  const handleStyleToggle = (style: Style) => {
+    togglePreferredStyle(style);
+  };
 
   const resetSuggestionInteractions = useSuggestionInteractions(
     (state) => state.reset,
@@ -71,7 +81,7 @@ export default function ProfileScreen() {
           <View>
             <Text variant="label">Email</Text>
             <Text variant="body" className="mt-1">
-              {session?.user.email ?? "—"}
+              {displayEmail(session)}
             </Text>
           </View>
 
@@ -101,6 +111,23 @@ export default function ProfileScreen() {
                   </Pressable>
                 );
               })}
+            </View>
+          </View>
+
+          <View>
+            <Text variant="label">Style</Text>
+            <Text variant="caption" className="mt-1 mb-3">
+              {stylesCaption(preferredStyles.length)}
+            </Text>
+            <View className="flex-row flex-wrap gap-2">
+              {STYLES.map((style) => (
+                <Pill
+                  key={style}
+                  label={style}
+                  selected={preferredStyles.includes(style)}
+                  onPress={() => handleStyleToggle(style)}
+                />
+              ))}
             </View>
           </View>
 
@@ -140,8 +167,23 @@ export default function ProfileScreen() {
   );
 }
 
+const displayEmail = (
+  session: { user?: { email?: string | null } } | null | undefined,
+): string => {
+  const email = session?.user?.email;
+  if (email) return email;
+  return "—";
+};
+
 const categoriesCaption = (visibleCount: number): string => {
   const total = CATEGORIES.length;
   if (visibleCount === total) return `Showing all ${total} — tap to hide ones you don't wear`;
   return `Showing ${visibleCount} of ${total} — tap a hidden category to bring it back`;
+};
+
+const stylesCaption = (pickedCount: number): string => {
+  if (pickedCount === 0) {
+    return `Pick up to ${MAX_PREFERRED_STYLES} aesthetics — outfit suggestions will lean into them.`;
+  }
+  return `${pickedCount} of ${MAX_PREFERRED_STYLES} picked — tap to add or remove.`;
 };

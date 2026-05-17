@@ -17,20 +17,50 @@ export const ratingToMultiplier = (rating: number): number => {
 };
 
 // Encourage variety — items worn recently get a temporary score nudge down.
-// The per-day curve is gentle enough that days inside the window produce
-// distinguishable scores rather than all colliding at the cap. The cap exists
-// so a four-piece outfit worn this morning can't single-handedly fall out of
-// the suggestion list.
+// The previous 14-day window had a hard cliff: a sweater worn 15 days ago
+// looked identical to one never worn. The new curve uses exponential decay
+// so the penalty fades smoothly out to ~60 days, giving the algorithm useful
+// signal for a full season of wear history.
 export const RECENCY = {
-  windowDays: 14,
-  // Penalty per item by how many days ago it was last worn.
-  // 0 = today, 1 = yesterday. Items beyond this list contribute no penalty.
-  penaltyByDaysAgo: [5, 4, 3, 2, 1, 1, 1] as const,
+  windowDays: 60,
+  // Penalty for an item worn today, decaying exponentially. We tune halfLife
+  // so an item worn ~14 days ago has roughly a quarter of its initial bite.
+  initialPenalty: 5,
+  halfLifeDays: 7,
   maxOutfitPenalty: 18,
 };
 
 export const recencyPenaltyForDaysAgo = (daysAgo: number): number => {
   if (daysAgo < 0) return 0;
-  if (daysAgo >= RECENCY.penaltyByDaysAgo.length) return 0;
-  return RECENCY.penaltyByDaysAgo[daysAgo];
+  if (daysAgo >= RECENCY.windowDays) return 0;
+  const decay = Math.exp(-(daysAgo * Math.LN2) / RECENCY.halfLifeDays);
+  const raw = RECENCY.initialPenalty * decay;
+  if (raw < 0.25) return 0;
+  return raw;
+};
+
+// Core-wardrobe nudge: items worn many times are reliable favorites. We
+// reward outfits that lean on them using log-scaled bonuses so a 30×-worn
+// piece doesn't dominate over a 5×-worn one.
+export const CORE_WARDROBE = {
+  // Per-item bonus = factor * log2(1 + wearCount). cap keeps a runaway
+  // favorite from drowning out novel combinations.
+  factor: 0.8,
+  perItemCap: 3,
+  outfitCap: 8,
+};
+
+export const coreWardrobeBonusFor = (wearCount: number): number => {
+  if (wearCount <= 0) return 0;
+  const raw = CORE_WARDROBE.factor * Math.log2(1 + wearCount);
+  if (raw > CORE_WARDROBE.perItemCap) return CORE_WARDROBE.perItemCap;
+  return raw;
+};
+
+// User style preference: small lift when an outfit's items match the vibes
+// the user picked at onboarding. Cold-start signal for new users with no
+// affinity data yet.
+export const STYLE_PREFERENCE = {
+  perItemBonus: 1.5,
+  outfitCap: 5,
 };

@@ -33,15 +33,15 @@ export function buildPalette(picks: Swatch[]): ExtractedPalette | null {
 export function nearestPresetSwatch(hex: string): Swatch {
   const target = hexToRgb(hex);
   let best = PRESET_PALETTE[0];
-  let bestDist = Infinity;
+  let bestDistance = Infinity;
   for (const swatch of PRESET_PALETTE) {
     const rgb = hexToRgb(swatch.hex);
-    const d =
+    const distance =
       (target[0] - rgb[0]) ** 2 +
       (target[1] - rgb[1]) ** 2 +
       (target[2] - rgb[2]) ** 2;
-    if (d < bestDist) {
-      bestDist = d;
+    if (distance < bestDistance) {
+      bestDistance = distance;
       best = swatch;
     }
   }
@@ -49,24 +49,24 @@ export function nearestPresetSwatch(hex: string): Swatch {
 }
 
 export function snapHexesToPresets(hexes: string[]): Swatch[] {
-  const out: Swatch[] = [];
+  const snapped: Swatch[] = [];
   const seen = new Set<string>();
   for (const hex of hexes) {
     if (!/^#[0-9a-fA-F]{6}$/.test(hex)) continue;
     const swatch = nearestPresetSwatch(hex);
     if (seen.has(swatch.hex)) continue;
     seen.add(swatch.hex);
-    out.push(swatch);
-    if (out.length >= 3) break;
+    snapped.push(swatch);
+    if (snapped.length >= 3) break;
   }
-  return out;
+  return snapped;
 }
 
 function hexToRgb(hex: string): [number, number, number] {
-  const c = hex.replace("#", "");
+  const clean = hex.replace("#", "");
   return [
-    parseInt(c.slice(0, 2), 16),
-    parseInt(c.slice(2, 4), 16),
-    parseInt(c.slice(4, 6), 16),
+    parseInt(clean.slice(0, 2), 16),
+    parseInt(clean.slice(2, 4), 16),
+    parseInt(clean.slice(4, 6), 16),
   ];
 }

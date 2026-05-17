@@ -6,8 +6,6 @@ import {
   TextInput,
   ActivityIndicator,
 } from "react-native";
-import * as ImagePicker from "expo-image-picker";
-import { Image } from "expo-image";
 import { router } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { toast } from "sonner-native";
@@ -18,8 +16,18 @@ import { Screen } from "~/components/ui/Screen";
 import { Text } from "~/components/ui/Text";
 import { Button } from "~/components/ui/Button";
 import { Pill } from "~/components/ui/Pill";
+import { Disclosure } from "~/components/ui/Disclosure";
+import { KeyboardAvoider } from "~/components/ui/KeyboardAvoider";
 import { Section } from "~/features/closet/components/Section";
 import { ItemFormBar } from "~/features/closet/components/ItemFormBar";
+import { ItemAttributesForm } from "~/features/closet/components/ItemAttributesForm";
+import { ItemPhotoPreview } from "~/features/closet/components/ItemPhotoPreview";
+import { launchPicker, type PickerSource } from "~/features/closet/itemPicker";
+import {
+  defaultFormalityFor,
+  defaultWarmthFor,
+  DEFAULT_PATTERN,
+} from "~/features/closet/itemDefaults";
 import {
   PRESET_PALETTE,
   buildPalette,
@@ -47,10 +55,6 @@ import {
 import { useCategoryPrefs } from "~/providers/CategoryPrefsProvider";
 import {
   CATEGORIES,
-  STYLES,
-  SEASONS,
-  PATTERNS,
-  OCCASIONS,
   type Category,
   type Style,
   type Season,
@@ -77,24 +81,13 @@ const ordinalLabel = (index: number): string => {
   return "3rd";
 };
 
-const PICKER_OPTIONS: Parameters<typeof ImagePicker.launchCameraAsync>[0] = {
-  mediaTypes: ["images"],
-  quality: 0.9,
-  allowsEditing: true,
-  aspect: [1, 1],
-};
-
-const launchPicker = (source: "camera" | "library") => {
-  if (source === "camera") return ImagePicker.launchCameraAsync(PICKER_OPTIONS);
-  return ImagePicker.launchImageLibraryAsync(PICKER_OPTIONS);
-};
-
-const INITIAL_WARMTH: Warmth = 2;
 
 export default function NewItemScreen() {
   const create = useCreateItem();
   const { visible: visibleCategories } = useCategoryPrefs();
   const initialCategory = pickInitialCategory(visibleCategories);
+  const initialWarmth = defaultWarmthFor(initialCategory);
+  const initialFormality = defaultFormalityFor(initialCategory);
 
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [picks, setPicks] = useState<Swatch[]>([]);
@@ -104,12 +97,14 @@ export default function NewItemScreen() {
   const [category, setCategory] = useState<Category>(initialCategory);
   const [styles, setStyles] = useState<Set<Style>>(new Set(["minimal"]));
   const [seasons, setSeasons] = useState<Set<Season>>(
-    new Set(seasonsForWarmth(INITIAL_WARMTH)),
+    new Set(seasonsForWarmth(initialWarmth)),
   );
   const [seasonsTouched, setSeasonsTouched] = useState(false);
-  const [pattern, setPattern] = useState<Pattern>("solid");
-  const [formality, setFormality] = useState<Formality>(3);
-  const [warmth, setWarmth] = useState<Warmth>(INITIAL_WARMTH);
+  const [pattern, setPattern] = useState<Pattern>(DEFAULT_PATTERN);
+  const [formality, setFormality] = useState<Formality>(initialFormality);
+  const [formalityTouched, setFormalityTouched] = useState(false);
+  const [warmth, setWarmth] = useState<Warmth>(initialWarmth);
+  const [warmthTouched, setWarmthTouched] = useState(false);
   const [occasions, setOccasions] = useState<Set<Occasion>>(new Set());
   const [priceText, setPriceText] = useState("");
   const [currencyText, setCurrencyText] = useState("");
@@ -120,14 +115,37 @@ export default function NewItemScreen() {
     setSeasons(new Set(seasonsForWarmth(warmth)));
   }, [warmth, seasonsTouched]);
 
+  // Switching category re-seats the smart defaults for any field the user
+  // hasn't explicitly touched. So a user adding a dress sees formality 4 and
+  // warmth 2 without ever opening the More details panel.
+  useEffect(() => {
+    if (!warmthTouched) setWarmth(defaultWarmthFor(category));
+    if (!formalityTouched) setFormality(defaultFormalityFor(category));
+  }, [category, warmthTouched, formalityTouched]);
+
   const [analyzing, setAnalyzing] = useState(false);
   const [trimming, setTrimming] = useState(false);
   const [autoFilled, setAutoFilled] = useState(false);
+  const [keepAdding, setKeepAdding] = useState(false);
   const colorsTouchedRef = useRef(false);
   const visionAttrsRef = useRef<VisionAttrs | null>(null);
   const analyzeReqRef = useRef(0);
 
-  async function pickPhoto(source: "camera" | "library") {
+  // Bulk-add support: reset the photo + colors + name to empty but keep the
+  // structural choices (category, style, formality, occasions) so a user
+  // photographing all their tops doesn't have to re-pick "top, minimal,
+  // formality 3" every time.
+  const resetForNextItem = () => {
+    setPhotoUri(null);
+    setPicks([]);
+    setName("");
+    setAutoFilled(false);
+    colorsTouchedRef.current = false;
+    visionAttrsRef.current = null;
+    analyzeReqRef.current += 1;
+  };
+
+  async function pickPhoto(source: PickerSource) {
     if (source === "camera") {
       const granted = await ensureCameraPermission();
       if (!granted) return;
@@ -187,7 +205,9 @@ export default function NewItemScreen() {
       visionAttrsRef.current = visionAttrs;
 
       if (!colorsTouchedRef.current && visionAttrs.colors.length > 0) {
-        const snapped = snapHexesToPresets(visionAttrs.colors.map((c) => c.hex));
+        const snapped = snapHexesToPresets(
+          visionAttrs.colors.map((color) => color.hex),
+        );
         if (snapped.length > 0) {
           setPicks(snapped);
           setAutoFilled(true);
@@ -200,14 +220,14 @@ export default function NewItemScreen() {
     }
   }
 
-  function toggleSwatch(s: Swatch) {
+  function toggleSwatch(swatch: Swatch) {
     colorsTouchedRef.current = true;
     setAutoFilled(false);
-    setPicks((prev) => {
-      const exists = prev.find((p) => p.hex === s.hex);
-      if (exists) return prev.filter((p) => p.hex !== s.hex);
-      if (prev.length >= 3) return prev;
-      return [...prev, s];
+    setPicks((previous) => {
+      const exists = previous.find((pick) => pick.hex === swatch.hex);
+      if (exists) return previous.filter((pick) => pick.hex !== swatch.hex);
+      if (previous.length >= 3) return previous;
+      return [...previous, swatch];
     });
   }
 
@@ -237,43 +257,17 @@ export default function NewItemScreen() {
       },
       {
         onSuccess: () => {
+          if (keepAdding) {
+            toast.success("Added — ready for the next one");
+            resetForNextItem();
+            return;
+          }
           toast.success("Added to closet");
           router.back();
         },
       },
     );
   }
-
-  function toggle<T>(set: Set<T>, value: T, setter: (s: Set<T>) => void) {
-    const next = new Set(set);
-    if (next.has(value)) next.delete(value);
-    else next.add(value);
-    setter(next);
-  }
-
-  const renderPhoto = () => (
-    <View className="rounded-xl overflow-hidden bg-line dark:bg-line-dark" style={{ aspectRatio: 1 }}>
-      <Image source={{ uri: photoUri! }} style={{ flex: 1 }} contentFit="cover" />
-      {trimming && (
-        <View className="absolute inset-0 items-center justify-center bg-black/30">
-          <ActivityIndicator color="#fff" />
-          <Text className="text-white mt-2">Removing background…</Text>
-        </View>
-      )}
-    </View>
-  );
-
-  const renderEmptyPhoto = () => (
-    <View
-      className="rounded-xl border-2 border-dashed border-line dark:border-line-dark items-center justify-center"
-      style={{ aspectRatio: 1 }}
-    >
-      <SymbolView name="camera" size={32} tintColor="#a8a29e" />
-      <Text variant="caption" className="mt-2">
-        Add a photo of the piece
-      </Text>
-    </View>
-  );
 
   const colorsSubtitle = (): string => {
     if (analyzing) return "Picking colors from the photo…";
@@ -289,11 +283,14 @@ export default function NewItemScreen() {
 
   return (
     <Screen edges={["bottom"]}>
-      <ScrollView contentContainerStyle={{ padding: 20, gap: 24, paddingBottom: 60 }}>
+      <KeyboardAvoider className="flex-1">
+      <ScrollView
+        contentContainerStyle={{ padding: 20, gap: 24, paddingBottom: 60 }}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* Photo */}
         <View>
-          {photoUri && renderPhoto()}
-          {!photoUri && renderEmptyPhoto()}
+          <ItemPhotoPreview photoUri={photoUri} trimming={trimming} />
           <View className="flex-row gap-2 mt-3">
             <Button
               label="Camera"
@@ -317,22 +314,22 @@ export default function NewItemScreen() {
           accessory={colorsAccessory()}
         >
           <View className="flex-row flex-wrap gap-3">
-            {PRESET_PALETTE.map((s) => {
-              const index = picks.findIndex((p) => p.hex === s.hex);
-              const selected = index >= 0;
+            {PRESET_PALETTE.map((swatch) => {
+              const pickIndex = picks.findIndex((pick) => pick.hex === swatch.hex);
+              const selected = pickIndex >= 0;
               return (
                 <Pressable
-                  key={s.hex}
-                  onPress={() => toggleSwatch(s)}
+                  key={swatch.hex}
+                  onPress={() => toggleSwatch(swatch)}
                   className="items-center"
                 >
                   <View
                     className={`w-12 h-12 rounded-full border-2 ${swatchBorderClass(selected)}`}
-                    style={{ backgroundColor: s.hex }}
+                    style={{ backgroundColor: swatch.hex }}
                   />
                   {selected && (
                     <Text variant="caption" className="mt-1">
-                      {ordinalLabel(index)}
+                      {ordinalLabel(pickIndex)}
                     </Text>
                   )}
                 </Pressable>
@@ -355,149 +352,115 @@ export default function NewItemScreen() {
         {/* Category */}
         <Section title="Category">
           <View className="flex-row flex-wrap gap-2">
-            {visibleCategories.map((c) => (
+            {visibleCategories.map((categoryOption) => (
               <Pill
-                key={c}
-                label={c}
-                selected={category === c}
-                onPress={() => setCategory(c)}
+                key={categoryOption}
+                label={categoryOption}
+                selected={category === categoryOption}
+                onPress={() => setCategory(categoryOption)}
               />
             ))}
           </View>
         </Section>
 
-        {/* Style */}
-        <Section title="Style" subtitle="Pick all that apply">
-          <View className="flex-row flex-wrap gap-2">
-            {STYLES.map((s) => (
-              <Pill
-                key={s}
-                label={s}
-                selected={styles.has(s)}
-                onPress={() => toggle(styles, s, setStyles)}
-              />
-            ))}
-          </View>
-        </Section>
-
-        {/* Pattern */}
-        <Section title="Pattern">
-          <View className="flex-row flex-wrap gap-2">
-            {PATTERNS.map((p) => (
-              <Pill
-                key={p}
-                label={p}
-                selected={pattern === p}
-                onPress={() => setPattern(p)}
-              />
-            ))}
-          </View>
-        </Section>
-
-        {/* Seasons */}
-        <Section title="Seasons" subtitle={seasonsSubtitle(seasonsTouched)}>
-          <View className="flex-row flex-wrap gap-2">
-            {SEASONS.map((season) => (
-              <Pill
-                key={season}
-                label={season}
-                selected={seasons.has(season)}
-                onPress={() => {
-                  setSeasonsTouched(true);
-                  toggle(seasons, season, setSeasons);
-                }}
-              />
-            ))}
-          </View>
-        </Section>
-
-        {/* Formality */}
-        <Section title="Formality" subtitle="1 = loungewear · 5 = black tie">
-          <View className="flex-row gap-2">
-            {[1, 2, 3, 4, 5].map((n) => (
-              <Pill
-                key={n}
-                label={String(n)}
-                selected={formality === n}
-                onPress={() => setFormality(n as Formality)}
-              />
-            ))}
-          </View>
-        </Section>
-
-        {/* Warmth */}
-        <Section title="Warmth" subtitle="0 = bare · 4 = parka">
-          <View className="flex-row gap-2">
-            {[0, 1, 2, 3, 4].map((n) => (
-              <Pill
-                key={n}
-                label={String(n)}
-                selected={warmth === n}
-                onPress={() => setWarmth(n as Warmth)}
-              />
-            ))}
-          </View>
-        </Section>
-
-        {/* Occasions */}
-        <Section title="Occasions" subtitle="Optional — when you'd reach for this piece">
-          <View className="flex-row flex-wrap gap-2">
-            {OCCASIONS.map((occasion) => (
-              <Pill
-                key={occasion}
-                label={occasion}
-                selected={occasions.has(occasion)}
-                onPress={() => toggle(occasions, occasion, setOccasions)}
-              />
-            ))}
-          </View>
-        </Section>
-
-        {/* Price */}
-        <Section title="Price" subtitle="Optional — used for cost-per-wear">
-          <View className="flex-row gap-2">
-            <TextInput
-              value={priceText}
-              onChangeText={setPriceText}
-              keyboardType="decimal-pad"
-              placeholder="0.00"
-              placeholderTextColor="#a8a29e"
-              className="flex-1 h-12 px-4 rounded-lg border border-line dark:border-line-dark text-ink dark:text-ink-dark"
-            />
-            <TextInput
-              value={currencyText}
-              onChangeText={setCurrencyText}
-              autoCapitalize="characters"
-              maxLength={3}
-              placeholder="USD"
-              placeholderTextColor="#a8a29e"
-              className="w-24 h-12 px-4 rounded-lg border border-line dark:border-line-dark text-ink dark:text-ink-dark"
-            />
-          </View>
-        </Section>
-
-        {/* Purchased on */}
-        <Section title="Purchased on" subtitle="Optional — YYYY-MM-DD">
-          <TextInput
-            value={purchasedOnText}
-            onChangeText={setPurchasedOnText}
-            placeholder="2026-05-10"
-            placeholderTextColor="#a8a29e"
-            keyboardType="numbers-and-punctuation"
-            className="h-12 px-4 rounded-lg border border-line dark:border-line-dark text-ink dark:text-ink-dark"
+        {/* Everything below this point is optional. Defaults are inferred
+            from the category — formality, warmth, seasons, pattern — so the
+            user can tap Save without opening the panel. */}
+        <Disclosure
+          title="More details"
+          subtitle="Style, fit, seasons, occasions, price"
+        >
+          <ItemAttributesForm
+            styles={styles}
+            onChangeStyles={setStyles}
+            pattern={pattern}
+            onChangePattern={setPattern}
+            seasons={seasons}
+            onChangeSeasons={(next) => {
+              setSeasonsTouched(true);
+              setSeasons(next);
+            }}
+            seasonsConfig={{ subtitle: seasonsSubtitle(seasonsTouched) }}
+            formality={formality}
+            onChangeFormality={(next) => {
+              setFormalityTouched(true);
+              setFormality(next);
+            }}
+            warmth={warmth}
+            onChangeWarmth={(next) => {
+              setWarmthTouched(true);
+              setWarmth(next);
+            }}
+            occasions={occasions}
+            onChangeOccasions={setOccasions}
+            priceText={priceText}
+            onChangePriceText={setPriceText}
+            currencyText={currencyText}
+            onChangeCurrencyText={setCurrencyText}
+            purchasedOnText={purchasedOnText}
+            onChangePurchasedOnText={setPurchasedOnText}
           />
-        </Section>
+        </Disclosure>
+
+        <KeepAddingToggle
+          enabled={keepAdding}
+          onChange={setKeepAdding}
+        />
 
       </ScrollView>
       <ItemFormBar
-        label="Save to closet"
+        label={saveButtonLabel(keepAdding)}
         onSave={save}
         saving={create.isPending}
         hint={blockedReason}
       />
+      </KeyboardAvoider>
     </Screen>
   );
 }
+
+const saveButtonLabel = (keepAdding: boolean): string => {
+  if (keepAdding) return "Save and add another";
+  return "Save to closet";
+};
+
+function KeepAddingToggle({
+  enabled,
+  onChange,
+}: {
+  enabled: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  return (
+    <Pressable
+      onPress={() => onChange(!enabled)}
+      hitSlop={8}
+      className="flex-row items-center gap-3 mt-2"
+    >
+      <View
+        className={toggleBoxClass(enabled)}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: enabled }}
+      >
+        {enabled && (
+          <SymbolView name="checkmark" size={14} tintColor="#ffffff" />
+        )}
+      </View>
+      <View className="flex-1">
+        <Text variant="body">Keep adding items</Text>
+        <Text variant="caption" className="mt-0.5">
+          Saves and clears the photo so you can shoot the next piece.
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
+const toggleBoxClass = (enabled: boolean): string => {
+  const base = "w-6 h-6 rounded-md items-center justify-center border";
+  if (enabled) return `${base} bg-ink dark:bg-ink-dark border-ink dark:border-ink-dark`;
+  return `${base} border-line dark:border-line-dark`;
+};
 
 const blockedReasonFor = ({
   photoUri,

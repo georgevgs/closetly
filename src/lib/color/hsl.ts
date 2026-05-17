@@ -11,17 +11,19 @@ export function hexToHsl(hex: string): HSL {
   let h = 0;
   let s = 0;
   if (max !== min) {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    const delta = max - min;
+    if (l > 0.5) s = delta / (2 - max - min);
+    else s = delta / (max + min);
     switch (max) {
       case r:
-        h = (g - b) / d + (g < b ? 6 : 0);
+        h = (g - b) / delta;
+        if (g < b) h += 6;
         break;
       case g:
-        h = (b - r) / d + 2;
+        h = (b - r) / delta + 2;
         break;
       case b:
-        h = (r - g) / d + 4;
+        h = (r - g) / delta + 4;
         break;
     }
     h *= 60;
@@ -30,28 +32,29 @@ export function hexToHsl(hex: string): HSL {
 }
 
 export function hslToHex({ h, s, l }: HSL): string {
-  const c = (1 - Math.abs(2 * l - 1)) * s;
-  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
-  const m = l - c / 2;
+  const chroma = (1 - Math.abs(2 * l - 1)) * s;
+  const secondLargest = chroma * (1 - Math.abs(((h / 60) % 2) - 1));
+  const match = l - chroma / 2;
   let r = 0,
     g = 0,
     b = 0;
-  if (h < 60) [r, g, b] = [c, x, 0];
-  else if (h < 120) [r, g, b] = [x, c, 0];
-  else if (h < 180) [r, g, b] = [0, c, x];
-  else if (h < 240) [r, g, b] = [0, x, c];
-  else if (h < 300) [r, g, b] = [x, 0, c];
-  else [r, g, b] = [c, 0, x];
-  const to = (v: number) =>
-    Math.round((v + m) * 255)
+  if (h < 60) [r, g, b] = [chroma, secondLargest, 0];
+  else if (h < 120) [r, g, b] = [secondLargest, chroma, 0];
+  else if (h < 180) [r, g, b] = [0, chroma, secondLargest];
+  else if (h < 240) [r, g, b] = [0, secondLargest, chroma];
+  else if (h < 300) [r, g, b] = [secondLargest, 0, chroma];
+  else [r, g, b] = [chroma, 0, secondLargest];
+  const toHex = (channel: number) =>
+    Math.round((channel + match) * 255)
       .toString(16)
       .padStart(2, "0");
-  return `#${to(r)}${to(g)}${to(b)}`;
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
 
-export function hueDistance(a: number, b: number): number {
-  const d = Math.abs(a - b) % 360;
-  return d > 180 ? 360 - d : d;
+export function hueDistance(firstHue: number, secondHue: number): number {
+  const distance = Math.abs(firstHue - secondHue) % 360;
+  if (distance > 180) return 360 - distance;
+  return distance;
 }
 
 export function isNeutral({ s, l }: HSL): boolean {

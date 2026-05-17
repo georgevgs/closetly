@@ -1,4 +1,4 @@
-import type { Item, Category, Occasion } from "../../types/items";
+import type { Item, Category, Occasion, Style } from "../../types/items";
 import { scoreOutfit, type ScoreBreakdown, type WeatherContext } from "./score";
 
 export type OutfitSuggestion = {
@@ -12,10 +12,15 @@ export type CombinatorOptions = {
   weather?: WeatherContext;
   pairAffinity?: Map<string, number>;
   recentlyWornItemIds?: Map<string, number>;
+  preferredStyles?: ReadonlySet<Style>;
+  itemWearCounts?: Map<string, number>;
   targetOccasion?: Occasion;
   limit?: number;
   includeOuterwear?: boolean;
 };
+
+const MIN_TOTAL_SCORE = 50;
+const PREFILTER_KEEP = 8;
 
 export function suggestOutfits(opts: CombinatorOptions): OutfitSuggestion[] {
   const {
@@ -24,41 +29,81 @@ export function suggestOutfits(opts: CombinatorOptions): OutfitSuggestion[] {
     weather,
     pairAffinity,
     recentlyWornItemIds,
+    preferredStyles,
+    itemWearCounts,
     targetOccasion,
     limit = 10,
     includeOuterwear,
   } = opts;
 
   const filteredCloset = filterClosetByOccasion(closet, anchor, targetOccasion);
-  const slots = pickSlots(anchor, includeOuterwear ?? shouldAddOuter(weather));
+  const withOuterwear = resolveIncludeOuterwear(includeOuterwear, weather);
+  const slots = pickSlots(anchor, withOuterwear);
   const buckets = bucketByCategory(filteredCloset, anchor);
-  const candidates = slots.map((slot) => {
-    if (slot === anchor.category) return [anchor];
-    return buckets.get(slot) ?? [];
-  });
+  const candidates = slots.map((slot) => candidatesForSlot(slot, anchor, buckets));
 
-  if (candidates.some((arr) => arr.length === 0)) {
-    const required = slots.filter((s, i) => candidates[i].length === 0);
-    if (required.some((s) => s !== "outerwear")) return [];
-  }
+  if (hasMissingRequiredSlot(slots, candidates)) return [];
 
-  const trimmed = candidates.map((arr, i) =>
-    slots[i] === anchor.category ? arr : prefilter(arr, anchor, weather).slice(0, 8)
-  );
+  const trimmed = trimCandidates(slots, candidates, anchor, weather);
 
   const combos: Item[][] = [];
   buildCombos(trimmed, 0, [], combos);
 
   const scored = combos.map((items) => ({
     items,
-    score: scoreOutfit(items, { weather, pairAffinity, recentlyWornItemIds }),
+    score: scoreOutfit(items, {
+      weather,
+      pairAffinity,
+      recentlyWornItemIds,
+      preferredStyles,
+      itemWearCounts,
+    }),
   }));
 
   return scored
-    .filter((s) => s.score.total >= 50)
-    .sort((a, b) => b.score.total - a.score.total)
+    .filter((suggestion) => suggestion.score.total >= MIN_TOTAL_SCORE)
+    .sort((first, second) => second.score.total - first.score.total)
     .slice(0, limit);
 }
+
+const resolveIncludeOuterwear = (
+  explicit: boolean | undefined,
+  weather: WeatherContext | undefined,
+): boolean => {
+  if (explicit !== undefined) return explicit;
+  return shouldAddOuter(weather);
+};
+
+const candidatesForSlot = (
+  slot: Category,
+  anchor: Item,
+  buckets: Map<Category, Item[]>,
+): Item[] => {
+  if (slot === anchor.category) return [anchor];
+  const items = buckets.get(slot);
+  if (items === undefined) return [];
+  return items;
+};
+
+const hasMissingRequiredSlot = (slots: Category[], candidates: Item[][]): boolean => {
+  for (let slotIndex = 0; slotIndex < slots.length; slotIndex++) {
+    if (candidates[slotIndex].length > 0) continue;
+    if (slots[slotIndex] !== "outerwear") return true;
+  }
+  return false;
+};
+
+const trimCandidates = (
+  slots: Category[],
+  candidates: Item[][],
+  anchor: Item,
+  weather: WeatherContext | undefined,
+): Item[][] => {
+  return candidates.map((slotCandidates, slotIndex) => {
+    if (slots[slotIndex] === anchor.category) return slotCandidates;
+    return prefilter(slotCandidates, anchor, weather).slice(0, PREFILTER_KEEP);
+  });
+};
 
 // The anchor itself is always included even if it doesn't match the
 // occasion — the user picked it explicitly. The filter only narrows the
@@ -89,34 +134,49 @@ function pickSlots(anchor: Item, withOuterwear: boolean): Category[] {
   return base;
 }
 
-function shouldAddOuter(w?: WeatherContext): boolean {
-  if (!w) return false;
-  return w.tempC < 16 || w.precip;
+function shouldAddOuter(weather: WeatherContext | undefined): boolean {
+  if (!weather) return false;
+  return weather.tempC < 16 || weather.precip;
 }
 
 function bucketByCategory(closet: Item[], anchor: Item): Map<Category, Item[]> {
-  const map = new Map<Category, Item[]>();
+  const buckets = new Map<Category, Item[]>();
   for (const item of closet) {
     if (item.id === anchor.id) continue;
-    const arr = map.get(item.category) ?? [];
-    arr.push(item);
-    map.set(item.category, arr);
+    const existing = buckets.get(item.category);
+    if (existing) {
+      existing.push(item);
+      continue;
+    }
+    buckets.set(item.category, [item]);
   }
-  return map;
+  return buckets;
 }
 
-function prefilter(items: Item[], anchor: Item, w?: WeatherContext): Item[] {
-  return items
-    .map((item) => ({ item, s: quickPairScore(item, anchor, w) }))
-    .sort((a, b) => b.s - a.s)
-    .map((x) => x.item);
+type ScoredCandidate = { item: Item; quickScore: number };
+
+function prefilter(
+  items: Item[],
+  anchor: Item,
+  weather: WeatherContext | undefined,
+): Item[] {
+  const scored: ScoredCandidate[] = items.map((item) => ({
+    item,
+    quickScore: quickPairScore(item, anchor, weather),
+  }));
+  scored.sort((first, second) => second.quickScore - first.quickScore);
+  return scored.map((entry) => entry.item);
 }
 
-function quickPairScore(item: Item, anchor: Item, w?: WeatherContext): number {
+function quickPairScore(
+  item: Item,
+  anchor: Item,
+  weather: WeatherContext | undefined,
+): number {
   let score = 50;
   score += formalityAdjustment(item, anchor);
   score += styleOverlapBonus(item, anchor);
-  if (w) score += seasonAdjustment(item, w);
+  if (weather) score += seasonAdjustment(item, weather);
   return score;
 }
 
@@ -135,9 +195,9 @@ const styleOverlapBonus = (item: Item, anchor: Item): number => {
 // instead of a -6 penalty (which previously hid them behind explicitly-tagged
 // items). The anchorPicker already takes the same neutral stance; this aligns
 // the prefilter with it.
-const seasonAdjustment = (item: Item, w: WeatherContext): number => {
+const seasonAdjustment = (item: Item, weather: WeatherContext): number => {
   if (item.seasons.length === 0) return 0;
-  if (matchesCurrentSeasons(item.seasons, w.tempC)) return 8;
+  if (matchesCurrentSeasons(item.seasons, weather.tempC)) return 8;
   return -6;
 };
 
@@ -147,19 +207,24 @@ const matchesCurrentSeasons = (seasons: Item["seasons"], tempC: number): boolean
   return seasons.includes("autumn") || seasons.includes("winter");
 };
 
-function buildCombos(buckets: Item[][], idx: number, acc: Item[], out: Item[][]) {
-  if (idx === buckets.length) {
-    out.push([...acc]);
+function buildCombos(
+  buckets: Item[][],
+  bucketIndex: number,
+  chosen: Item[],
+  output: Item[][],
+) {
+  if (bucketIndex === buckets.length) {
+    output.push([...chosen]);
     return;
   }
-  const bucket = buckets[idx];
+  const bucket = buckets[bucketIndex];
   if (bucket.length === 0) {
-    buildCombos(buckets, idx + 1, acc, out);
+    buildCombos(buckets, bucketIndex + 1, chosen, output);
     return;
   }
   for (const item of bucket) {
-    acc.push(item);
-    buildCombos(buckets, idx + 1, acc, out);
-    acc.pop();
+    chosen.push(item);
+    buildCombos(buckets, bucketIndex + 1, chosen, output);
+    chosen.pop();
   }
 }

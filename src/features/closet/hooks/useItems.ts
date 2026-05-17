@@ -21,11 +21,27 @@ export const itemsKeys = {
   all: ["items"] as const,
   list: (userId: string) => ["items", "list", userId] as const,
   one: (id: string) => ["items", "one", id] as const,
+  noop: ["items", "noop"] as const,
+};
+
+const listKey = (userId: string | undefined) => {
+  if (userId) return itemsKeys.list(userId);
+  return itemsKeys.noop;
+};
+
+const oneKey = (id: string | undefined) => {
+  if (id) return itemsKeys.one(id);
+  return itemsKeys.noop;
+};
+
+const itemOrNull = (data: unknown): Item | null => {
+  if (!data) return null;
+  return itemFromRow(data as ItemRow);
 };
 
 export function useItems(userId: string | undefined) {
   return useQuery({
-    queryKey: userId ? itemsKeys.list(userId) : ["items", "noop"],
+    queryKey: listKey(userId),
     enabled: !!userId,
     queryFn: async (): Promise<Item[]> => {
       const { data, error } = await supabase
@@ -41,7 +57,7 @@ export function useItems(userId: string | undefined) {
 
 export function useItem(id: string | undefined) {
   return useQuery({
-    queryKey: id ? itemsKeys.one(id) : ["items", "noop"],
+    queryKey: oneKey(id),
     enabled: !!id,
     queryFn: async (): Promise<Item | null> => {
       const { data, error } = await supabase
@@ -50,19 +66,19 @@ export function useItem(id: string | undefined) {
         .eq("id", id!)
         .maybeSingle();
       if (error) throw error;
-      return data ? itemFromRow(data as ItemRow) : null;
+      return itemOrNull(data);
     },
   });
 }
 
 export function useDeleteItem() {
-  const qc = useQueryClient();
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("items").update({ archived: true }).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: itemsKeys.all }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: itemsKeys.all }),
     onError: (error) =>
       handleError(error, { fallbackMessage: "Couldn't remove this item." }),
   });
@@ -85,7 +101,7 @@ export type UpdateItemInput = {
 };
 
 export function useUpdateItem() {
-  const qc = useQueryClient();
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: UpdateItemInput) => {
       const { id, silhouette, purchasedOn, ...columns } = input;
@@ -100,9 +116,9 @@ export function useUpdateItem() {
         .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: (_, vars) => {
-      qc.invalidateQueries({ queryKey: itemsKeys.all });
-      qc.invalidateQueries({ queryKey: itemsKeys.one(vars.id) });
+    onSuccess: (_data, input) => {
+      queryClient.invalidateQueries({ queryKey: itemsKeys.all });
+      queryClient.invalidateQueries({ queryKey: itemsKeys.one(input.id) });
     },
     onError: (error) =>
       handleError(error, { fallbackMessage: "Couldn't save your changes." }),
@@ -139,7 +155,7 @@ const mergeableVisionAttrs = (raw: unknown): Record<string, unknown> => {
 };
 
 export function useReplaceItemPhoto() {
-  const qc = useQueryClient();
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({
       id,
@@ -155,7 +171,7 @@ export function useReplaceItemPhoto() {
       if (!userId) throw new Error("Not authenticated");
 
       await uploadItemImage(photoUri, userId, id);
-      const visionAttrs = await analyzeItemFromUri(analysisUri ?? photoUri);
+      const visionAttrs = await analyzeItemFromUri(analysisOrPhoto(analysisUri, photoUri));
       const colors = visionColorsToItemColors(visionAttrs.colors);
 
       const { error } = await supabase
@@ -167,12 +183,20 @@ export function useReplaceItemPhoto() {
         .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: (_, vars) => {
-      qc.invalidateQueries({ queryKey: itemsKeys.all });
-      qc.invalidateQueries({ queryKey: itemsKeys.one(vars.id) });
-      qc.invalidateQueries({ queryKey: ["item-signed", vars.id] });
+    onSuccess: (_data, input) => {
+      queryClient.invalidateQueries({ queryKey: itemsKeys.all });
+      queryClient.invalidateQueries({ queryKey: itemsKeys.one(input.id) });
+      queryClient.invalidateQueries({ queryKey: ["item-signed", input.id] });
     },
     onError: (error) =>
       handleError(error, { fallbackMessage: "Couldn't replace the photo." }),
   });
 }
+
+const analysisOrPhoto = (
+  analysisUri: string | undefined,
+  photoUri: string,
+): string => {
+  if (analysisUri) return analysisUri;
+  return photoUri;
+};

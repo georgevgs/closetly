@@ -6,12 +6,12 @@ export type ThemePreference = "system" | "light" | "dark";
 
 const STORAGE_KEY = "closetly:theme";
 
-type ThemeCtx = {
+type ThemeContextValue = {
   preference: ThemePreference;
-  setPreference: (p: ThemePreference) => void;
+  setPreference: (next: ThemePreference) => void;
 };
 
-const ThemeContext = createContext<ThemeCtx | null>(null);
+const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const { setColorScheme } = useNwColorScheme();
@@ -26,10 +26,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     });
   }, [setColorScheme]);
 
-  const setPreference = (p: ThemePreference) => {
-    setPreferenceState(p);
-    setColorScheme(p);
-    AsyncStorage.setItem(STORAGE_KEY, p);
+  const setPreference = (next: ThemePreference) => {
+    setPreferenceState(next);
+    setColorScheme(next);
+    AsyncStorage.setItem(STORAGE_KEY, next);
   };
 
   return (
@@ -40,7 +40,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function useThemePreference() {
-  const ctx = useContext(ThemeContext);
-  if (!ctx) throw new Error("useThemePreference must be used inside ThemeProvider");
-  return ctx;
+  const context = useContext(ThemeContext);
+  if (!context) {
+    throw new Error("useThemePreference must be used inside ThemeProvider");
+  }
+  return context;
 }

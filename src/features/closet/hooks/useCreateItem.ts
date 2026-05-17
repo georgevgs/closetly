@@ -14,7 +14,7 @@ export type NewItemInput = Omit<TablesInsert<"items">, "user_id" | "photo_path" 
 };
 
 export function useCreateItem() {
-  const qc = useQueryClient();
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: NewItemInput) => {
       const { data: userData } = await supabase.auth.getUser();
@@ -38,15 +38,22 @@ export function useCreateItem() {
           photo_path: photoPath,
           thumb_path: thumbPath,
           colors: rest.colors as unknown as TablesInsert<"items">["colors"],
-          vision_attrs: (visionAttrs ?? {}) as unknown as Json,
+          vision_attrs: visionAttrsOrEmpty(visionAttrs),
         })
         .select()
         .single();
       if (error) throw error;
       return data;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: itemsKeys.all }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: itemsKeys.all }),
     onError: (error) =>
       handleError(error, { fallbackMessage: "Couldn't add this item. Please try again." }),
   });
 }
+
+const visionAttrsOrEmpty = (
+  visionAttrs: VisionAttrs | null | undefined,
+): Json => {
+  if (!visionAttrs) return {} as Json;
+  return visionAttrs as unknown as Json;
+};

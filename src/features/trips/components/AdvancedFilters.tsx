@@ -30,9 +30,7 @@ export function AdvancedFilters({
       <Pressable
         onPress={() => setExpanded(!expanded)}
         accessibilityRole="button"
-        accessibilityLabel={
-          expanded ? "Hide advanced filters" : "Show advanced filters"
-        }
+        accessibilityLabel={accessibilityLabelFor(expanded)}
         className="flex-row items-center justify-between px-4 h-12"
       >
         <View>
@@ -42,7 +40,7 @@ export function AdvancedFilters({
           </Text>
         </View>
         <SymbolView
-          name={expanded ? "chevron.up" : "chevron.down"}
+          name={chevronNameFor(expanded)}
           size={14}
           tintColor="#a8a29e"
         />
@@ -88,4 +86,14 @@ const filterSummary = ({
   const tempLabel = `${tempMin}–${tempMax}°C`;
   if (seasons.size === 0) return `${tempLabel} · any season`;
   return `${tempLabel} · ${[...seasons].join(", ")}`;
+};
+
+const chevronNameFor = (isOpen: boolean): "chevron.up" | "chevron.down" => {
+  if (isOpen) return "chevron.up";
+  return "chevron.down";
+};
+
+const accessibilityLabelFor = (isOpen: boolean): string => {
+  if (isOpen) return "Hide advanced filters";
+  return "Show advanced filters";
 };

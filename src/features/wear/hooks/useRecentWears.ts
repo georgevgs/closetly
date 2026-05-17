@@ -14,7 +14,10 @@ export function useRecentWears(userId: string | undefined) {
       if (!userId) return new Map();
 
       const today = new Date();
-      const cutoff = subtractDays(today, RECENCY.windowDays);
+      // RECENCY.windowDays is the model's outer horizon; we widen the query
+      // slightly so an item right at the edge still produces a 0-penalty hit
+      // instead of getting truncated to "never worn".
+      const cutoff = subtractDays(today, RECENCY.windowDays + 1);
 
       const wears = await fetchRecentWears(userId, cutoff);
       if (wears.length === 0) return new Map();

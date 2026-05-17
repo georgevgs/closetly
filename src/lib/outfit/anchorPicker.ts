@@ -57,7 +57,24 @@ const anchorScore = (
   let score = 50;
   score += seasonBonus(item, weather);
   score -= recencyPenalty(item, recentlyWornItemIds);
+  score += rediscoveryBonus(item, recentlyWornItemIds);
   return score;
+};
+
+// Small nudge toward pieces that aren't already in this week's rotation.
+// Implicit-signal recommender literature treats "novelty" as a first-class
+// objective alongside relevance — without it the algorithm keeps surfacing
+// the same five anchors and the closet feels smaller than it is.
+const REDISCOVERY_BONUS = 4;
+
+const rediscoveryBonus = (
+  item: Item,
+  recentlyWornItemIds: Map<string, number> | undefined,
+): number => {
+  if (!recentlyWornItemIds) return 0;
+  if (recentlyWornItemIds.size === 0) return 0;
+  if (recentlyWornItemIds.has(item.id)) return 0;
+  return REDISCOVERY_BONUS;
 };
 
 const seasonBonus = (item: Item, weather: WeatherContext | undefined): number => {
