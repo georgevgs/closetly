@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { View, ScrollView, TextInput, ActivityIndicator, Pressable } from "react-native";
+import { View, ScrollView, TextInput, ActivityIndicator } from "react-native";
 import { Image } from "expo-image";
 import { useLocalSearchParams, router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
@@ -14,6 +14,7 @@ import { KeyboardAvoider } from "~/components/ui/KeyboardAvoider";
 import { Section } from "~/features/closet/components/Section";
 import { ItemFormBar } from "~/features/closet/components/ItemFormBar";
 import { ItemAttributesForm } from "~/features/closet/components/ItemAttributesForm";
+import { WarmthDefaultsButton } from "~/features/closet/components/WarmthDefaultsButton";
 import { useItem, useUpdateItem, useReplaceItemPhoto } from "~/features/closet/hooks/useItems";
 import { launchPicker, signFirst, type PickerSource } from "~/features/closet/itemPicker";
 import { seasonsForWarmth } from "~/lib/seasons";
@@ -289,22 +290,6 @@ const categoryOptionsFor = (
   return [current, ...visible];
 };
 
-function WarmthDefaultsButton({
-  warmth,
-  onApply,
-}: {
-  warmth: Warmth;
-  onApply: () => void;
-}) {
-  return (
-    <Pressable onPress={onApply} hitSlop={8} className="mt-2 self-start">
-      <Text variant="caption" className="underline">
-        Use warmth defaults ({warmthLabel(warmth)})
-      </Text>
-    </Pressable>
-  );
-}
-
 const initialFit = (silhouette: Silhouette | null): Fit | null => {
   if (!silhouette) return null;
   return silhouette.fit;
@@ -340,10 +325,3 @@ const silhouetteFromFit = (
   return { ...current, fit };
 };
 
-const warmthLabel = (warmth: Warmth): string => {
-  if (warmth === 0) return "bare";
-  if (warmth === 1) return "light";
-  if (warmth === 2) return "regular";
-  if (warmth === 3) return "warm";
-  return "parka";
-};

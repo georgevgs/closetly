@@ -11,3 +11,11 @@ export const seasonsForWarmth = (warmth: Warmth): Season[] => {
   if (warmth === 3) return ["autumn", "winter"];
   return ["winter"];
 };
+
+export const warmthLabel = (warmth: Warmth): string => {
+  if (warmth === 0) return "bare";
+  if (warmth === 1) return "light";
+  if (warmth === 2) return "regular";
+  if (warmth === 3) return "warm";
+  return "parka";
+};

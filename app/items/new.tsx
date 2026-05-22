@@ -21,6 +21,7 @@ import { KeyboardAvoider } from "~/components/ui/KeyboardAvoider";
 import { Section } from "~/features/closet/components/Section";
 import { ItemFormBar } from "~/features/closet/components/ItemFormBar";
 import { ItemAttributesForm } from "~/features/closet/components/ItemAttributesForm";
+import { WarmthDefaultsButton } from "~/features/closet/components/WarmthDefaultsButton";
 import { ItemPhotoPreview } from "~/features/closet/components/ItemPhotoPreview";
 import { launchPicker, type PickerSource } from "~/features/closet/itemPicker";
 import {
@@ -99,7 +100,6 @@ export default function NewItemScreen() {
   const [seasons, setSeasons] = useState<Set<Season>>(
     new Set(seasonsForWarmth(initialWarmth)),
   );
-  const [seasonsTouched, setSeasonsTouched] = useState(false);
   const [pattern, setPattern] = useState<Pattern>(DEFAULT_PATTERN);
   const [formality, setFormality] = useState<Formality>(initialFormality);
   const [formalityTouched, setFormalityTouched] = useState(false);
@@ -109,11 +109,6 @@ export default function NewItemScreen() {
   const [priceText, setPriceText] = useState("");
   const [currencyText, setCurrencyText] = useState("");
   const [purchasedOnText, setPurchasedOnText] = useState("");
-
-  useEffect(() => {
-    if (seasonsTouched) return;
-    setSeasons(new Set(seasonsForWarmth(warmth)));
-  }, [warmth, seasonsTouched]);
 
   // Switching category re-seats the smart defaults for any field the user
   // hasn't explicitly touched. So a user adding a dress sees formality 4 and
@@ -376,11 +371,15 @@ export default function NewItemScreen() {
             pattern={pattern}
             onChangePattern={setPattern}
             seasons={seasons}
-            onChangeSeasons={(next) => {
-              setSeasonsTouched(true);
-              setSeasons(next);
+            onChangeSeasons={setSeasons}
+            seasonsConfig={{
+              accessory: (
+                <WarmthDefaultsButton
+                  warmth={warmth}
+                  onApply={() => setSeasons(new Set(seasonsForWarmth(warmth)))}
+                />
+              ),
             }}
-            seasonsConfig={{ subtitle: seasonsSubtitle(seasonsTouched) }}
             formality={formality}
             onChangeFormality={(next) => {
               setFormalityTouched(true);
@@ -474,7 +473,3 @@ const blockedReasonFor = ({
   return null;
 };
 
-const seasonsSubtitle = (touched: boolean): string => {
-  if (touched) return "Pick all that apply";
-  return "Suggested from warmth — tap to adjust";
-};
