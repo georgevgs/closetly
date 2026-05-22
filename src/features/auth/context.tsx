@@ -14,14 +14,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
+    let cancelled = false;
+
+    const settle = (nextSession: Session | null) => {
+      if (cancelled) return;
+      setSession(nextSession);
       setLoading(false);
+    };
+
+    supabase.auth
+      .getSession()
+      .then(({ data }) => settle(data.session))
+      .catch(() => settle(null));
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      settle(nextSession);
     });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
-      setSession(s);
-    });
-    return () => sub.subscription.unsubscribe();
+
+    return () => {
+      cancelled = true;
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
   return <AuthContext.Provider value={{ session, loading }}>{children}</AuthContext.Provider>;

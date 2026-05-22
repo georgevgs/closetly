@@ -56,37 +56,48 @@ const priceFromRow = (raw: ItemRow["price"]): number | null => {
 };
 
 export async function signItemUrls(items: Item[]): Promise<Item[]> {
-  const paths = items.map((item) => storagePathFor(item));
-  if (paths.length === 0) return items;
-  const { data, error } = await supabase.storage
-    .from("closet-photos")
-    .createSignedUrls(paths, SIGNED_URL_TTL);
-  if (error || !data) return items;
-  return items.map((item, itemIndex) => signedCopy(item, data[itemIndex]?.signedUrl));
+  if (items.length === 0) return items;
+
+  const photoPaths = items.map((item) => item.photo_url);
+  const thumbPaths = items.map((item) => item.thumb_url);
+
+  const signedPhotos = await signBatch(photoPaths);
+  const signedThumbs = await signBatch(thumbPaths);
+
+  return items.map((item, itemIndex) => ({
+    ...item,
+    photo_url: signedOrOriginal(signedPhotos[itemIndex], item.photo_url),
+    thumb_url: signedOrOriginal(signedThumbs[itemIndex], item.thumb_url),
+  }));
 }
 
-const storagePathFor = (item: Item): string => {
-  if (item.thumb_url) return item.thumb_url;
-  return item.photo_url;
+const signBatch = async (
+  paths: (string | null)[],
+): Promise<(string | null)[]> => {
+  const presentPaths = paths.filter((path): path is string => path !== null);
+  if (presentPaths.length === 0) return paths.map(() => null);
+
+  const { data, error } = await supabase.storage
+    .from("closet-photos")
+    .createSignedUrls(presentPaths, SIGNED_URL_TTL);
+  if (error || !data) return paths.map(() => null);
+
+  const signedByPath = new Map<string, string>();
+  data.forEach((entry, entryIndex) => {
+    const originalPath = presentPaths[entryIndex];
+    if (entry.signedUrl) signedByPath.set(originalPath, entry.signedUrl);
+  });
+
+  return paths.map((path) => {
+    if (path === null) return null;
+    return signedByPath.get(path) ?? null;
+  });
 };
 
-// When no signed URL comes back, keep the originals as-is. When one comes back,
-// route it to both photo_url and thumb_url *only if the original had them set* —
-// preserving null on thumb_url so callers can still distinguish "thumb missing"
-// from "thumb signed".
-const signedCopy = (item: Item, signedUrl: string | null | undefined): Item => {
-  if (!signedUrl) return item;
-  return {
-    ...item,
-    photo_url: signedUrl,
-    thumb_url: thumbForSigned(item.thumb_url, signedUrl),
-  };
-};
-
-const thumbForSigned = (
-  originalThumb: string | null,
-  signedUrl: string,
-): string | null => {
-  if (originalThumb === null) return null;
-  return signedUrl;
+const signedOrOriginal = <T extends string | null>(
+  signedUrl: string | null,
+  original: T,
+): T | string => {
+  if (signedUrl) return signedUrl;
+  return original;
 };

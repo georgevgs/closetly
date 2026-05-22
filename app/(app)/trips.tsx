@@ -85,6 +85,19 @@ export default function TripsScreen() {
   const itemCount = capsuleItemCount(capsule);
   const saveBlockedReason = blockedReason({ trimmedName, itemCount });
 
+  const resetForm = () => {
+    const nextStart = atMidnight(new Date());
+    const nextEnd = addDays(nextStart, DEFAULT_TRIP_LENGTH_DAYS - 1);
+    setName("");
+    setDestination("");
+    setNotes("");
+    setStartDate(nextStart);
+    setEndDate(nextEnd);
+    setTempMin(DEFAULT_TEMP_MIN);
+    setTempMax(DEFAULT_TEMP_MAX);
+    setSeasons(new Set(["spring", "autumn"]));
+  };
+
   const saveTrip = () => {
     if (!capsule) return;
     if (saveBlockedReason !== null) return;
@@ -103,9 +116,7 @@ export default function TripsScreen() {
       {
         onSuccess: () => {
           toast.success("Trip saved");
-          setName("");
-          setDestination("");
-          setNotes("");
+          resetForm();
         },
       },
     );

@@ -106,13 +106,18 @@ export function useUpdateItem() {
     mutationFn: async (input: UpdateItemInput) => {
       const { id, silhouette, purchasedOn, ...columns } = input;
 
+      const updatePayload: TablesUpdate<"items"> = {
+        ...columns,
+        purchased_on: purchasedOn,
+      };
+
       if (silhouette !== undefined) {
-        await writeSilhouette(id, silhouette);
+        updatePayload.vision_attrs = await mergedVisionAttrs(id, silhouette);
       }
 
       const { error } = await supabase
         .from("items")
-        .update({ ...columns, purchased_on: purchasedOn })
+        .update(updatePayload)
         .eq("id", id);
       if (error) throw error;
     },
@@ -126,11 +131,13 @@ export function useUpdateItem() {
 }
 
 // vision_attrs is a non-strict jsonb blob (colors, silhouette, future fields).
-// We read-modify-write so a silhouette change doesn't clobber the stored colors.
-const writeSilhouette = async (
+// We read-modify-merge here so a silhouette change doesn't clobber the stored
+// colors, then return the merged value so the caller can write it together
+// with the rest of the columns in one UPDATE.
+const mergedVisionAttrs = async (
   itemId: string,
   silhouette: Silhouette | null,
-): Promise<void> => {
+): Promise<Json> => {
   const { data: row, error: readError } = await supabase
     .from("items")
     .select("vision_attrs")
@@ -140,12 +147,7 @@ const writeSilhouette = async (
 
   const current = mergeableVisionAttrs(row?.vision_attrs);
   const next = { ...current, silhouette };
-
-  const { error } = await supabase
-    .from("items")
-    .update({ vision_attrs: next as unknown as Json })
-    .eq("id", itemId);
-  if (error) throw error;
+  return next as unknown as Json;
 };
 
 const mergeableVisionAttrs = (raw: unknown): Record<string, unknown> => {

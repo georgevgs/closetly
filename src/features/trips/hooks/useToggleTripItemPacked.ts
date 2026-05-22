@@ -15,12 +15,16 @@ export const useToggleTripItemPacked = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: ToggleTripItemPackedInput): Promise<void> => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("trip_items")
         .update({ packed: input.packed })
         .eq("trip_id", input.tripId)
-        .eq("item_id", input.itemId);
+        .eq("item_id", input.itemId)
+        .select("item_id");
       if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error("Trip item not found");
+      }
     },
     onMutate: async (input) => {
       const queryKey = tripKeys.detail(input.tripId);
