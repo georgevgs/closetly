@@ -1,3 +1,4 @@
+import { intentColors } from "~/lib/designTokens";
 import { useState } from "react";
 import { Pressable, View } from "react-native";
 import { SymbolView } from "expo-symbols";
@@ -36,7 +37,7 @@ export const Disclosure = ({
             </Text>
           )}
         </View>
-        <SymbolView name={chevronNameFor(open)} size={14} tintColor="#a8a29e" />
+        <SymbolView name={chevronNameFor(open)} size={14} tintColor={intentColors.placeholder} />
       </Pressable>
       {open && <View className="gap-6 mt-2">{children}</View>}
     </View>

@@ -1,16 +1,21 @@
-import { Alert, ActivityIndicator, Pressable, ScrollView, View } from "react-native";
+import { Alert, Pressable, ScrollView, View } from "react-native";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { useColorScheme } from "nativewind";
 
 import { Screen } from "~/components/ui/Screen";
 import { Text } from "~/components/ui/Text";
+import { Card } from "~/components/ui/Card";
+import { ChromePill } from "~/components/ui/ChromePill";
 import { GlassSurface } from "~/components/ui/GlassSurface";
+import { FloatingChromeGroup } from "~/components/ui/FloatingChromeGroup";
+import { spacing } from "~/lib/designTokens";
 import { useTrip, type TripDetail, type TripItemEntry } from "~/features/trips/hooks/useTrip";
 import { useToggleTripItemPacked } from "~/features/trips/hooks/useToggleTripItemPacked";
 import { useSetAllTripItemsPacked } from "~/features/trips/hooks/useSetAllTripItemsPacked";
 import { useDeleteTrip } from "~/features/trips/hooks/useTrips";
 import { PackingList } from "~/features/trips/components/PackingList";
+import { TripDetailSkeleton } from "~/features/trips/components/TripDetailSkeleton";
 import { parseDateOnly } from "~/lib/dates";
 import { foregroundFor } from "~/lib/utils";
 
@@ -25,8 +30,8 @@ export default function TripDetailScreen() {
 
   if (isLoading) {
     return (
-      <Screen className="items-center justify-center">
-        <ActivityIndicator />
+      <Screen>
+        <TripDetailSkeleton />
       </Screen>
     );
   }
@@ -73,17 +78,25 @@ export default function TripDetailScreen() {
         options={{
           title: trip.name,
           headerRight: () => (
-            <View className="flex-row items-center" style={{ gap: 6 }}>
+            <FloatingChromeGroup spacing={6}>
               <EditHeaderButton foreground={foreground} onPress={() => openEditTrip(trip.id)} />
               <DeleteHeaderButton foreground={foreground} onPress={handleDelete} />
-            </View>
+            </FloatingChromeGroup>
           ),
         }}
       />
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60, gap: 20 }}>
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: spacing.screenX,
+          paddingBottom: 60,
+          gap: spacing.stackMd,
+        }}
+        contentInsetAdjustmentBehavior="automatic"
+      >
         <TripHeaderCard trip={trip} />
         <PackingProgressCard
           items={trip.items}
+          foreground={foreground}
           onPackAll={handlePackAll}
           onUnpackAll={handleUnpackAll}
         />
@@ -155,10 +168,7 @@ function HeaderIconButton({
 
 function TripHeaderCard({ trip }: { trip: TripDetail }) {
   return (
-    <GlassSurface
-      style={{ borderRadius: 20, padding: 16, overflow: "hidden" }}
-      fallbackClassName="bg-canvas dark:bg-canvas-dark border border-line/40 dark:border-line-dark/40 rounded-2xl"
-    >
+    <Card padding="md">
       <Text variant="caption" className="uppercase tracking-widest">
         Trip
       </Text>
@@ -186,51 +196,59 @@ function TripHeaderCard({ trip }: { trip: TripDetail }) {
           {trip.notes}
         </Text>
       )}
-    </GlassSurface>
+    </Card>
   );
 }
 
 function PackingProgressCard({
   items,
+  foreground,
   onPackAll,
   onUnpackAll,
 }: {
   items: TripItemEntry[];
+  foreground: string;
   onPackAll: () => void;
   onUnpackAll: () => void;
 }) {
   const packed = countPacked(items);
   const total = items.length;
   return (
-    <View className="rounded-xl border border-line dark:border-line-dark p-4">
+    <Card padding="md">
       <View className="flex-row items-baseline justify-between">
         <Text variant="label">Packing</Text>
         <Text variant="caption">{progressFraction(packed, total)}</Text>
       </View>
       <ProgressBar packed={packed} total={total} />
-      <View className="mt-2 flex-row items-center justify-between">
+      <View
+        className="mt-3 flex-row items-center justify-between"
+        style={{ gap: spacing.groupGap }}
+      >
         <Text variant="caption" className="flex-1 pr-2">
           {progressMessage(packed, total)}
         </Text>
         <BatchPackButton
           packedCount={packed}
           totalCount={total}
+          foreground={foreground}
           onPackAll={onPackAll}
           onUnpackAll={onUnpackAll}
         />
       </View>
-    </View>
+    </Card>
   );
 }
 
 function BatchPackButton({
   packedCount,
   totalCount,
+  foreground,
   onPackAll,
   onUnpackAll,
 }: {
   packedCount: number;
   totalCount: number;
+  foreground: string;
   onPackAll: () => void;
   onUnpackAll: () => void;
 }) {
@@ -239,17 +257,19 @@ function BatchPackButton({
   const label = batchPackLabel(allPacked);
   const handlePress = batchPackHandler(allPacked, onPackAll, onUnpackAll);
   return (
-    <Pressable
+    <ChromePill
+      label={label}
+      symbol={batchPackSymbol(allPacked)}
+      foreground={foreground}
       onPress={handlePress}
-      hitSlop={8}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      className="px-3 py-1.5 rounded-full border border-line dark:border-line-dark"
-    >
-      <Text variant="caption">{label}</Text>
-    </Pressable>
+    />
   );
 }
+
+const batchPackSymbol = (allPacked: boolean) => {
+  if (allPacked) return "tray" as const;
+  return "tray.and.arrow.down" as const;
+};
 
 const batchPackLabel = (allPacked: boolean): string => {
   if (allPacked) return "Unpack all";

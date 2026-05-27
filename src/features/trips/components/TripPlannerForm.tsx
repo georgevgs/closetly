@@ -1,3 +1,4 @@
+import { intentColors } from "~/lib/designTokens";
 import { TextInput, View } from "react-native";
 import { Text } from "~/components/ui/Text";
 import { DateField } from "~/components/ui/DateField";
@@ -53,7 +54,7 @@ export function TripPlannerForm({
           value={name}
           onChangeText={onChangeName}
           placeholder="e.g. Lisbon weekend"
-          placeholderTextColor="#a8a29e"
+          placeholderTextColor={intentColors.placeholder}
           className="h-12 px-4 rounded-lg border border-line dark:border-line-dark text-ink dark:text-ink-dark"
         />
       </View>
@@ -66,7 +67,7 @@ export function TripPlannerForm({
           value={destination}
           onChangeText={onChangeDestination}
           placeholder="e.g. Lisbon, Portugal"
-          placeholderTextColor="#a8a29e"
+          placeholderTextColor={intentColors.placeholder}
           className="h-12 px-4 rounded-lg border border-line dark:border-line-dark text-ink dark:text-ink-dark"
         />
       </View>
@@ -99,7 +100,7 @@ export function TripPlannerForm({
           value={notes}
           onChangeText={onChangeNotes}
           placeholder="Anything to remember while packing"
-          placeholderTextColor="#a8a29e"
+          placeholderTextColor={intentColors.placeholder}
           multiline
           numberOfLines={3}
           textAlignVertical="top"

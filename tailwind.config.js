@@ -31,6 +31,14 @@ module.exports = {
         },
         sage: "#7d8a6a",
         clay: "#c8a78a",
+        success: {
+          DEFAULT: "#7d8a6a",
+          dark: "#9aa685",
+        },
+        destructive: {
+          DEFAULT: "#a85a3b",
+          dark: "#d18a6c",
+        },
       },
       fontFamily: {
         sans: ["Inter", "system-ui"],

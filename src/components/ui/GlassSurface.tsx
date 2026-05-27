@@ -1,36 +1,48 @@
-import { View, type ViewProps, Platform } from "react-native";
+import { useEffect, useState } from "react";
+import {
+  AccessibilityInfo,
+  View,
+  type ViewProps,
+  type ViewStyle,
+} from "react-native";
 import { GlassView, isGlassEffectAPIAvailable } from "expo-glass-effect";
 import { cn } from "../../lib/utils";
 
 type GlassStyle = "regular" | "clear";
+type GlassVariant = "card" | "capsule" | "circle";
 
 type Props = ViewProps & {
   glassEffectStyle?: GlassStyle;
   isInteractive?: boolean;
   tintColor?: string;
   fallbackClassName?: string;
+  variant?: GlassVariant;
 };
 
-const liquidGlassAvailable =
-  Platform.OS === "ios" && isGlassEffectAPIAvailable();
+const liquidGlassAvailable = isGlassEffectAPIAvailable();
 
 export function GlassSurface({
   glassEffectStyle = "regular",
   isInteractive,
   tintColor,
   fallbackClassName,
+  variant,
   className,
   style,
   children,
   ...rest
 }: Props) {
-  if (liquidGlassAvailable) {
+  const reduceTransparency = useReduceTransparency();
+  const shapeStyle = shapeStyleFor(variant);
+  const composedStyle = composeStyle(shapeStyle, style);
+
+  if (liquidGlassAvailable && !reduceTransparency) {
     return (
       <GlassView
         glassEffectStyle={glassEffectStyle}
         isInteractive={isInteractive}
         tintColor={tintColor}
-        style={style}
+        style={composedStyle}
         {...rest}
       >
         {children}
@@ -40,9 +52,9 @@ export function GlassSurface({
 
   return (
     <View
-      style={style}
+      style={composedStyle}
       className={cn(
-        "bg-canvas/80 dark:bg-canvas-dark/80 border border-line/40 dark:border-line-dark/40",
+        "bg-canvas dark:bg-canvas-dark border border-line dark:border-line-dark",
         fallbackClassName,
         className,
       )}
@@ -52,3 +64,46 @@ export function GlassSurface({
     </View>
   );
 }
+
+const useReduceTransparency = (): boolean => {
+  const [reduceTransparency, setReduceTransparency] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    AccessibilityInfo.isReduceTransparencyEnabled().then((value) => {
+      if (isMounted) setReduceTransparency(value);
+    });
+    const subscription = AccessibilityInfo.addEventListener(
+      "reduceTransparencyChanged",
+      (value) => {
+        if (isMounted) setReduceTransparency(value);
+      },
+    );
+    return () => {
+      isMounted = false;
+      subscription.remove();
+    };
+  }, []);
+
+  return reduceTransparency;
+};
+
+const shapeStyleFor = (variant: GlassVariant | undefined): ViewStyle | null => {
+  if (variant === undefined) return null;
+  if (variant === "circle") {
+    return { borderRadius: 9999, overflow: "hidden" };
+  }
+  if (variant === "capsule") {
+    return { borderRadius: 9999, overflow: "hidden" };
+  }
+  return { borderRadius: 20, overflow: "hidden" };
+};
+
+const composeStyle = (
+  shapeStyle: ViewStyle | null,
+  style: Props["style"],
+): Props["style"] => {
+  if (shapeStyle === null) return style;
+  if (style === undefined) return shapeStyle;
+  return [shapeStyle, style];
+};

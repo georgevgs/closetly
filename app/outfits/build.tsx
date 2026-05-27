@@ -1,3 +1,4 @@
+import { intentColors } from "~/lib/designTokens";
 import { useMemo, useRef, useState } from "react";
 import { ScrollView, TextInput, View } from "react-native";
 import { router } from "expo-router";
@@ -7,6 +8,7 @@ import type { BottomSheetModal } from "@gorhom/bottom-sheet";
 import { Screen } from "~/components/ui/Screen";
 import { Text } from "~/components/ui/Text";
 import { Pill } from "~/components/ui/Pill";
+import { Card } from "~/components/ui/Card";
 import { KeyboardAvoider } from "~/components/ui/KeyboardAvoider";
 import { useAuth } from "~/features/auth/context";
 import { useSignedItems } from "~/features/closet/hooks/useSignedItems";
@@ -24,6 +26,7 @@ import { useOutfitBuilder } from "~/features/outfits/hooks/useOutfitBuilder";
 import { SlotTile } from "~/features/outfits/components/SlotTile";
 import { SlotPickerSheet } from "~/features/outfits/components/SlotPickerSheet";
 import { OutfitActionBar } from "~/features/outfits/components/OutfitActionBar";
+import { useBottomBarSpacing } from "~/components/ui/BottomBar";
 import { toWeatherContext } from "~/features/outfits/weatherContext";
 import { scoreOutfit, type ScoreBreakdown } from "~/lib/outfit/score";
 import type { Category, Item } from "~/types/items";
@@ -57,6 +60,7 @@ export default function BuildOutfitScreen() {
   const builder = useOutfitBuilder();
   const save = useSaveOutfit();
   const wear = useLogWear();
+  const bottomBarSpacing = useBottomBarSpacing();
 
   const [name, setName] = useState("");
   const [visibleSlots, setVisibleSlots] = useState<Category[]>(DEFAULT_VISIBLE_SLOTS);
@@ -136,7 +140,11 @@ export default function BuildOutfitScreen() {
     <Screen edges={["bottom"]}>
       <KeyboardAvoider className="flex-1">
       <ScrollView
-        contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 20 }}
+        contentContainerStyle={{
+          padding: 16,
+          paddingBottom: bottomBarSpacing,
+          gap: 20,
+        }}
         keyboardShouldPersistTaps="handled"
       >
         <NameField value={name} onChange={setName} />
@@ -188,7 +196,7 @@ function NameField({
         value={value}
         onChangeText={onChange}
         placeholder="e.g. Friday brunch"
-        placeholderTextColor="#a8a29e"
+        placeholderTextColor={intentColors.placeholder}
         className="h-12 px-4 rounded-lg border border-line dark:border-line-dark text-ink dark:text-ink-dark"
       />
     </View>
@@ -204,7 +212,7 @@ function ScoreBlock({
 }) {
   if (!score) return <ScorePlaceholder itemCount={itemCount} />;
   return (
-    <View className="rounded-xl border border-line dark:border-line-dark p-4">
+    <Card padding="md">
       <View className="flex-row items-baseline justify-between">
         <View>
           <Text variant="caption" className="uppercase tracking-widest">
@@ -218,20 +226,20 @@ function ScoreBlock({
       </View>
       <ScoreChips score={score} />
       {score.notes.length > 0 && <ScoreNotes notes={score.notes} />}
-    </View>
+    </Card>
   );
 }
 
 function ScorePlaceholder({ itemCount }: { itemCount: number }) {
   return (
-    <View className="rounded-xl border border-dashed border-line dark:border-line-dark p-4">
+    <Card padding="md" className="border-dashed">
       <Text variant="caption" className="uppercase tracking-widest">
         Match
       </Text>
       <Text variant="body" className="mt-1">
         {placeholderMessage(itemCount)}
       </Text>
-    </View>
+    </Card>
   );
 }
 

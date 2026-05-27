@@ -1,5 +1,7 @@
 import { forwardRef, useCallback } from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import { ScrollView, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useColorScheme } from "nativewind";
 import {
   BottomSheetModal,
   BottomSheetView,
@@ -9,6 +11,7 @@ import {
 
 import { Text } from "~/components/ui/Text";
 import { Pill } from "~/components/ui/Pill";
+import { PressableScale } from "~/components/ui/PressableScale";
 import { STYLES, SEASONS, PATTERNS, OCCASIONS } from "~/types/items";
 import { type ClosetFilters, tagFilterCount } from "~/features/closet/filters";
 
@@ -33,19 +36,33 @@ export const ClosetFilterSheet = forwardRef<
     [],
   );
 
+  const { colorScheme } = useColorScheme();
+  const sheetTheme = sheetThemeFor(colorScheme);
+  const insets = useSafeAreaInsets();
+  const scrollBottomPadding = insets.bottom + 32;
+
   return (
     <BottomSheetModal
       ref={ref}
       snapPoints={SNAP_POINTS}
       enableDynamicSizing={false}
+      enablePanDownToClose
       backdropComponent={renderBackdrop}
+      handleIndicatorStyle={{ backgroundColor: sheetTheme.handle }}
+      backgroundStyle={{ backgroundColor: sheetTheme.background }}
     >
       <BottomSheetView style={{ flex: 1 }}>
         <SheetHeader
           activeCount={tagFilterCount(filters)}
           onClear={onClear}
         />
-        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 20 }}>
+        <ScrollView
+          contentContainerStyle={{
+            padding: 16,
+            paddingBottom: scrollBottomPadding,
+            gap: 20,
+          }}
+        >
           <FilterGroup
             title="Style"
             options={STYLES}
@@ -84,7 +101,16 @@ export const ClosetFilterSheet = forwardRef<
   );
 });
 
-const SNAP_POINTS = ["75%"];
+const SNAP_POINTS = ["55%", "90%"];
+
+const sheetThemeFor = (
+  colorScheme: "light" | "dark" | null | undefined,
+): { handle: string; background: string } => {
+  if (colorScheme === "dark") {
+    return { handle: "rgba(255,255,255,0.28)", background: "#1c1a18" };
+  }
+  return { handle: "rgba(0,0,0,0.2)", background: "#f5f3ef" };
+};
 
 function SheetHeader({
   activeCount,
@@ -96,11 +122,11 @@ function SheetHeader({
   return (
     <View className="flex-row items-center justify-between px-4 py-3 border-b border-line dark:border-line-dark">
       <Text variant="title">Filters</Text>
-      <Pressable onPress={onClear} hitSlop={8}>
+      <PressableScale onPress={onClear} hitSlop={8}>
         <Text variant="caption" className="underline">
           {clearLabel(activeCount)}
         </Text>
-      </Pressable>
+      </PressableScale>
     </View>
   );
 }

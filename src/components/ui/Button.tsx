@@ -1,13 +1,13 @@
-import { Pressable, type PressableProps, View, ActivityIndicator } from "react-native";
+import { type PressableProps, View, ActivityIndicator } from "react-native";
 import * as Haptics from "expo-haptics";
 import { Text } from "./Text";
+import { PressableScale } from "./PressableScale";
 import { cn } from "../../lib/utils";
 
 type Variant = "primary" | "secondary" | "ghost" | "destructive";
 type Size = "sm" | "md" | "lg";
 
-const base =
-  "items-center justify-center flex-row rounded-lg active:opacity-80";
+const base = "items-center justify-center flex-row rounded-lg";
 const variants: Record<Variant, { container: string; text: string }> = {
   primary: { container: "bg-ink dark:bg-ink-dark", text: "text-canvas dark:text-canvas-dark" },
   secondary: {
@@ -15,7 +15,7 @@ const variants: Record<Variant, { container: string; text: string }> = {
     text: "text-ink dark:text-ink-dark",
   },
   ghost: { container: "bg-transparent", text: "text-ink dark:text-ink-dark" },
-  destructive: { container: "bg-red-600", text: "text-white" },
+  destructive: { container: "bg-destructive dark:bg-destructive-dark", text: "text-canvas dark:text-canvas-dark" },
 };
 const sizes: Record<Size, string> = {
   sm: "h-9 px-3",
@@ -23,7 +23,7 @@ const sizes: Record<Size, string> = {
   lg: "h-14 px-6",
 };
 
-type Props = Omit<PressableProps, "children"> & {
+type Props = Omit<PressableProps, "children" | "style"> & {
   label: string;
   variant?: Variant;
   size?: Size;
@@ -46,10 +46,11 @@ export function Button({
   ...rest
 }: Props) {
   const styles = variants[variant];
+  const isDisabled = isButtonDisabled(disabled, loading);
   return (
-    <Pressable
+    <PressableScale
       {...rest}
-      disabled={disabled || loading}
+      disabled={isDisabled}
       onPress={(event) => {
         if (haptic) Haptics.selectionAsync();
         onPress?.(event);
@@ -58,12 +59,12 @@ export function Button({
         base,
         sizes[size],
         styles.container,
-        (disabled || loading) && "opacity-50",
-        className
+        isDisabled && "opacity-50",
+        className,
       )}
     >
       <ButtonBody loading={loading} leading={leading} label={label} textClass={styles.text} />
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -86,3 +87,12 @@ function ButtonBody({
     </View>
   );
 }
+
+const isButtonDisabled = (
+  disabled: boolean | null | undefined,
+  loading: boolean | undefined,
+): boolean => {
+  if (disabled === true) return true;
+  if (loading === true) return true;
+  return false;
+};

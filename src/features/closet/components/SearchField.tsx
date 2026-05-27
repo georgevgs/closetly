@@ -1,5 +1,10 @@
-import { Pressable, TextInput, View } from "react-native";
+import { TextInput } from "react-native";
+import { useColorScheme } from "nativewind";
 import { SymbolView } from "expo-symbols";
+
+import { GlassSurface } from "~/components/ui/GlassSurface";
+import { PressableScale } from "~/components/ui/PressableScale";
+import { intentColors, spacing, symbolStyles } from "~/lib/designTokens";
 
 type Props = {
   value: string;
@@ -8,27 +13,62 @@ type Props = {
 
 export function SearchField({ value, onChange }: Props) {
   const showClear = value.length > 0;
+  const { colorScheme } = useColorScheme();
+  const keyboardAppearance = keyboardAppearanceFor(colorScheme);
 
   return (
-    <View className="flex-1 h-10 px-4 rounded-full border border-line dark:border-line-dark flex-row items-center">
+    <GlassSurface
+      variant="capsule"
+      style={{
+        flex: 1,
+        height: spacing.touchTarget,
+        paddingHorizontal: 16,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+      }}
+      fallbackClassName="bg-canvas/70 dark:bg-canvas-dark/70 border border-line dark:border-line-dark"
+    >
+      <SymbolView
+        name="magnifyingglass"
+        size={symbolStyles.chromeSecondary.size}
+        tintColor={intentColors.placeholder}
+        weight={symbolStyles.chromeSecondary.weight}
+      />
       <TextInput
         value={value}
         onChangeText={onChange}
         placeholder="Search by name or brand"
-        placeholderTextColor="#a8a29e"
+        placeholderTextColor={intentColors.placeholder}
         className="flex-1 text-ink dark:text-ink-dark"
         returnKeyType="search"
+        keyboardAppearance={keyboardAppearance}
+        autoCapitalize="none"
+        autoCorrect={false}
+        clearButtonMode="never"
+        maxFontSizeMultiplier={1.4}
       />
       {showClear && (
-        <Pressable
+        <PressableScale
           onPress={() => onChange("")}
           accessibilityRole="button"
           accessibilityLabel="Clear search"
           hitSlop={8}
         >
-          <SymbolView name="xmark.circle.fill" size={16} tintColor="#a8a29e" />
-        </Pressable>
+          <SymbolView
+            name="xmark.circle.fill"
+            size={symbolStyles.chromeSecondary.size}
+            tintColor={intentColors.placeholder}
+          />
+        </PressableScale>
       )}
-    </View>
+    </GlassSurface>
   );
 }
+
+const keyboardAppearanceFor = (
+  colorScheme: "light" | "dark" | null | undefined,
+): "light" | "dark" => {
+  if (colorScheme === "dark") return "dark";
+  return "light";
+};

@@ -1,11 +1,14 @@
-import { Pressable, View } from "react-native";
+import { View } from "react-native";
 import { Image } from "expo-image";
 import { SymbolView } from "expo-symbols";
 import * as Haptics from "expo-haptics";
 
 import { Text } from "~/components/ui/Text";
+import { Card } from "~/components/ui/Card";
+import { PressableScale } from "~/components/ui/PressableScale";
 import { CATEGORIES, type Category, type Item } from "~/types/items";
 import { cn } from "~/lib/utils";
+import { intentColors, radii } from "~/lib/designTokens";
 import type { TripItemEntry } from "~/features/trips/hooks/useTrip";
 
 const CATEGORY_LABELS: Record<Category, string> = {
@@ -39,9 +42,9 @@ export function PackingList({
 
 function EmptyPacking() {
   return (
-    <View className="rounded-xl border border-line dark:border-line-dark p-6">
+    <Card padding="lg">
       <Text variant="body">This trip has no pieces packed.</Text>
-    </View>
+    </Card>
   );
 }
 
@@ -78,14 +81,18 @@ function PackingRow({
   entry: TripItemEntry;
   onToggle: (entry: TripItemEntry) => void;
 }) {
+  const handlePress = () => {
+    Haptics.selectionAsync();
+    onToggle(entry);
+  };
   return (
-    <Pressable
-      onPress={() => {
-        Haptics.selectionAsync();
-        onToggle(entry);
-      }}
+    <PressableScale
+      onPress={handlePress}
+      accessibilityRole="button"
+      accessibilityLabel={packingRowAccessibilityLabel(entry)}
+      style={{ borderRadius: radii.row, padding: 8 }}
       className={cn(
-        "flex-row items-center rounded-lg border p-2",
+        "flex-row items-center border",
         rowBorderClass(entry.packed),
       )}
     >
@@ -99,9 +106,15 @@ function PackingRow({
         </Text>
       </View>
       <PackedIndicator packed={entry.packed} />
-    </Pressable>
+    </PressableScale>
   );
 }
+
+const packingRowAccessibilityLabel = (entry: TripItemEntry): string => {
+  const name = itemDisplayName(entry.item);
+  if (entry.packed) return `${name}, packed. Tap to unpack.`;
+  return `${name}, not packed. Tap to pack.`;
+};
 
 function Thumbnail({ item, faded }: { item: Item; faded: boolean }) {
   return (
@@ -199,6 +212,6 @@ const packedIcon = (packed: boolean) => {
 };
 
 const packedTint = (packed: boolean): string => {
-  if (packed) return "#5a7a3b";
-  return "#a8a29e";
+  if (packed) return intentColors.success;
+  return intentColors.muted;
 };

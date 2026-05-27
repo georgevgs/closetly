@@ -79,35 +79,6 @@ const VARIANTS: Variant[] = [
     },
   },
   {
-    filename: "android-icon-foreground.png",
-    options: {
-      size: 512,
-      background: null,
-      bodyColor: COLORS.ink,
-      accentColor: COLORS.neon,
-      scale: 0.66,
-    },
-  },
-  {
-    filename: "android-icon-background.png",
-    options: {
-      size: 512,
-      background: COLORS.canvas,
-      bodyColor: COLORS.canvas,
-      accentColor: COLORS.canvas,
-    },
-  },
-  {
-    filename: "android-icon-monochrome.png",
-    options: {
-      size: 432,
-      background: null,
-      bodyColor: COLORS.white,
-      accentColor: COLORS.white,
-      scale: 0.66,
-    },
-  },
-  {
     filename: "splash-icon.png",
     options: {
       size: 600,

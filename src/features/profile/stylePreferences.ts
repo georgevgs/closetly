@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { STYLES, type Style } from "~/types/items";
@@ -63,8 +63,6 @@ const hydrate = async (): Promise<void> => {
 // preferences ready by the time the home screen mounts.
 hydrate();
 
-export const getPreferredStyles = (): Style[] => cached;
-
 export const setPreferredStyles = async (next: Style[]): Promise<void> => {
   const deduped = dedupeAndClamp(next);
   cached = deduped;
@@ -91,19 +89,17 @@ export const togglePreferredStyle = async (style: Style): Promise<void> => {
   await setPreferredStyles([...cached, style]);
 };
 
+const subscribe = (listener: () => void): (() => void) => {
+  subscribers.add(listener);
+  return () => {
+    subscribers.delete(listener);
+  };
+};
+
+const getSnapshot = (): Style[] => cached;
+
 export const usePreferredStyles = (): Style[] => {
-  const [value, setValue] = useState<Style[]>(cached);
-
-  useEffect(() => {
-    const subscriber = () => setValue(cached);
-    subscribers.add(subscriber);
-    if (hydrated) setValue(cached);
-    return () => {
-      subscribers.delete(subscriber);
-    };
-  }, []);
-
-  return value;
+  return useSyncExternalStore(subscribe, getSnapshot);
 };
 
 // Synchronous Set view used by the scoring path. Recomputed in callers via

@@ -1,5 +1,6 @@
 import { View } from "react-native";
 import { Text } from "~/components/ui/Text";
+import { Card } from "~/components/ui/Card";
 import { CategoryRow } from "./CategoryRow";
 import type { Capsule } from "~/features/trips/capsule";
 
@@ -10,7 +11,7 @@ export function CapsulePreview({ capsule }: { capsule: Capsule }) {
 
   return (
     <View className="mt-8 gap-4">
-      <View className="rounded-xl border border-line dark:border-line-dark p-4">
+      <Card padding="md">
         <Text variant="caption" className="uppercase tracking-widest">
           Capsule
         </Text>
@@ -18,7 +19,7 @@ export function CapsulePreview({ capsule }: { capsule: Capsule }) {
         <Text variant="caption" className="mt-1">
           Updates as you tweak the filters above.
         </Text>
-      </View>
+      </Card>
 
       {Object.entries(capsule.byCategory).map(([category, list]) => {
         if (list.length === 0) return null;
@@ -30,11 +31,13 @@ export function CapsulePreview({ capsule }: { capsule: Capsule }) {
 
 function CapsuleEmptyState() {
   return (
-    <View className="mt-8 rounded-xl border border-dashed border-line dark:border-line-dark p-6">
-      <Text variant="title">Nothing matches yet</Text>
-      <Text variant="caption" className="mt-1">
-        Try widening the temperature range or adding more seasons.
-      </Text>
+    <View className="mt-8">
+      <Card padding="lg" className="border-dashed">
+        <Text variant="title">Nothing matches yet</Text>
+        <Text variant="caption" className="mt-1">
+          Try widening the temperature range or adding more seasons.
+        </Text>
+      </Card>
     </View>
   );
 }

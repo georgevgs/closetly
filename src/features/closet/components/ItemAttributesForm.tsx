@@ -1,3 +1,4 @@
+import { intentColors } from "~/lib/designTokens";
 import { ReactNode } from "react";
 import { TextInput, View } from "react-native";
 
@@ -274,7 +275,7 @@ function PriceSection({
           onChangeText={onChangePriceText}
           keyboardType="decimal-pad"
           placeholder="0.00"
-          placeholderTextColor="#a8a29e"
+          placeholderTextColor={intentColors.placeholder}
           className="flex-1 h-12 px-4 rounded-lg border border-line dark:border-line-dark text-ink dark:text-ink-dark"
         />
         <TextInput
@@ -283,7 +284,7 @@ function PriceSection({
           autoCapitalize="characters"
           maxLength={3}
           placeholder="USD"
-          placeholderTextColor="#a8a29e"
+          placeholderTextColor={intentColors.placeholder}
           className="w-24 h-12 px-4 rounded-lg border border-line dark:border-line-dark text-ink dark:text-ink-dark"
         />
       </View>
@@ -304,7 +305,7 @@ function PurchasedOnSection({
         value={purchasedOnText}
         onChangeText={onChange}
         placeholder="2026-05-10"
-        placeholderTextColor="#a8a29e"
+        placeholderTextColor={intentColors.placeholder}
         keyboardType="numbers-and-punctuation"
         className="h-12 px-4 rounded-lg border border-line dark:border-line-dark text-ink dark:text-ink-dark"
       />

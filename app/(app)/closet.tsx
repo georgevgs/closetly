@@ -1,21 +1,27 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { View, Pressable, ScrollView, ActivityIndicator } from "react-native";
+import { useMemo, useRef, useState } from "react";
+import { ActionSheetIOS, RefreshControl, View, ScrollView } from "react-native";
+import Animated, { FadeIn } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColorScheme } from "nativewind";
 import { FlashList } from "@shopify/flash-list";
+import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { SymbolView } from "expo-symbols";
 import * as Haptics from "expo-haptics";
 import type { BottomSheetModal } from "@gorhom/bottom-sheet";
 
 import { Screen } from "~/components/ui/Screen";
-import { Text } from "~/components/ui/Text";
 import { Pill } from "~/components/ui/Pill";
 import { CircularGlassButton } from "~/components/ui/CircularGlassButton";
+import { FloatingChromeGroup } from "~/components/ui/FloatingChromeGroup";
+import { ChromePill } from "~/components/ui/ChromePill";
+import { ScreenTitlePill } from "~/components/ui/ScreenTitlePill";
+import { spacing, symbolStyles } from "~/lib/designTokens";
 import { ItemCard } from "~/features/closet/components/ItemCard";
 import { ClosetFilterSheet } from "~/features/closet/components/ClosetFilterSheet";
 import { ActiveFilterChips } from "~/features/closet/components/ActiveFilterChips";
 import { SearchField } from "~/features/closet/components/SearchField";
 import { ClosetEmptyState } from "~/features/closet/components/ClosetEmptyState";
+import { ClosetGridSkeleton } from "~/features/closet/components/ClosetGridSkeleton";
 import { useSignedItems } from "~/features/closet/hooks/useSignedItems";
 import { useAuth } from "~/features/auth/context";
 import { useCategoryPrefs } from "~/providers/CategoryPrefsProvider";
@@ -60,11 +66,22 @@ export default function ClosetScreen() {
   const [filter, setFilter] = useState<Category | "all">("all");
   const [sort, setSort] = useState<SortMode>("newest");
   const [filters, setFilters] = useState<ClosetFilters>(emptyClosetFilters);
+  const [chromeHeight, setChromeHeight] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const filterSheetRef = useRef<BottomSheetModal>(null);
+  const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    if (filter !== "all" && !visibleCategories.includes(filter)) setFilter("all");
-  }, [filter, visibleCategories]);
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await queryClient.invalidateQueries();
+    setIsRefreshing(false);
+  };
+
+  // If the user hides the currently-active category in their prefs, fall back
+  // to "all" for the view without resetting the stored filter — re-enabling
+  // the category later restores their selection.
+  const effectiveFilter = effectiveCategoryFilter(filter, visibleCategories);
   const { colorScheme } = useColorScheme();
   const foreground = foregroundFor(colorScheme);
 
@@ -77,23 +94,32 @@ export default function ClosetScreen() {
   const visibleItems = useMemo(() => {
     if (!items) return [];
     const filtered = applyClosetFilters(items, filtersForApply);
-    const byCategory = filterByCategory(filtered, filter);
+    const byCategory = filterByCategory(filtered, effectiveFilter);
     return sortItems(byCategory, sort);
-  }, [items, filtersForApply, filter, sort]);
+  }, [items, filtersForApply, effectiveFilter, sort]);
 
   const totalCount = totalItemCount(items);
-  const visibleCount = visibleItems.length;
   const activeTags = listActiveTags(filters);
   const hasActiveFilters = isFiltering({
     activeTagCount: activeTags.length,
     searchText: filters.searchText,
-    categoryFilter: filter,
+    categoryFilter: effectiveFilter,
   });
 
-  const cycleSort = () => {
-    Haptics.selectionAsync();
-    const index = SORT_MODES.indexOf(sort);
-    setSort(SORT_MODES[(index + 1) % SORT_MODES.length]);
+  const openSortPicker = () => {
+    const options = SORT_MODES.map((mode) => SORT_LABEL[mode]);
+    const labels = [...options, "Cancel"];
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        options: labels,
+        cancelButtonIndex: labels.length - 1,
+        title: "Sort items",
+      },
+      (buttonIndex) => {
+        if (buttonIndex >= SORT_MODES.length) return;
+        setSort(SORT_MODES[buttonIndex]);
+      },
+    );
   };
 
   const updateSearchText = (next: string) => {
@@ -101,7 +127,6 @@ export default function ClosetScreen() {
   };
 
   const openFilterSheet = () => {
-    Haptics.selectionAsync();
     filterSheetRef.current?.present();
   };
 
@@ -126,35 +151,42 @@ export default function ClosetScreen() {
 
   return (
     <Screen>
-      <ClosetHeader sort={sort} onCycleSort={cycleSort} foreground={foreground} />
-      <SearchAndFilterBar
-        searchText={filters.searchText}
-        onChangeSearchText={updateSearchText}
-        activeFilterCount={tagFilterCount(filters)}
-        onOpenFilters={openFilterSheet}
-      />
-      <ActiveFilterChips
-        tags={activeTags}
-        onRemove={removeTag}
-        onClearAll={clearTagFilters}
-      />
-      <CategoryRow
-        visibleCategories={visibleCategories}
-        active={filter}
-        onSelect={setFilter}
-      />
-      <CountBadge
-        visibleCount={visibleCount}
-        totalCount={totalCount}
-        isLoading={isLoading}
-      />
       <ClosetBody
         isLoading={isLoading}
         items={visibleItems}
         hasAnyItems={totalCount > 0}
         hasActiveFilters={hasActiveFilters}
+        chromeHeight={chromeHeight}
+        bottomPadding={insets.bottom + 40}
+        isRefreshing={isRefreshing}
+        onRefresh={handleRefresh}
+        listHeader={
+          <ListHeaderBlock
+            activeTags={activeTags}
+            onRemoveTag={removeTag}
+            onClearTagFilters={clearTagFilters}
+          />
+        }
         onClearEverything={clearEverything}
       />
+      <View
+        pointerEvents="box-none"
+        onLayout={(event) => setChromeHeight(event.nativeEvent.layout.height)}
+        style={{ position: "absolute", top: 0, left: 0, right: 0 }}
+      >
+        <ChromeOverlay
+          sort={sort}
+          onCycleSort={openSortPicker}
+          foreground={foreground}
+          searchText={filters.searchText}
+          onChangeSearchText={updateSearchText}
+          activeFilterCount={tagFilterCount(filters)}
+          onOpenFilters={openFilterSheet}
+          visibleCategories={visibleCategories}
+          activeCategory={effectiveFilter}
+          onSelectCategory={setFilter}
+        />
+      </View>
       <ClosetFilterSheet
         ref={filterSheetRef}
         filters={filters}
@@ -165,45 +197,104 @@ export default function ClosetScreen() {
   );
 }
 
-function ClosetHeader({
+function ChromeOverlay({
   sort,
   onCycleSort,
   foreground,
+  searchText,
+  onChangeSearchText,
+  activeFilterCount,
+  onOpenFilters,
+  visibleCategories,
+  activeCategory,
+  onSelectCategory,
 }: {
   sort: SortMode;
   onCycleSort: () => void;
   foreground: string;
+  searchText: string;
+  onChangeSearchText: (next: string) => void;
+  activeFilterCount: number;
+  onOpenFilters: () => void;
+  visibleCategories: Category[];
+  activeCategory: Category | "all";
+  onSelectCategory: (next: Category | "all") => void;
 }) {
   return (
-    <View className="flex-row items-center justify-between px-6 pt-4 pb-2">
-      <Text variant="display">Closet</Text>
-      <View className="flex-row items-center gap-2">
-        <Pressable
-          onPress={onCycleSort}
-          hitSlop={8}
-          className="flex-row items-center gap-1.5 h-9 px-3 rounded-full border border-line dark:border-line-dark"
+    <View>
+      <View
+        className="flex-row items-center justify-between"
+        style={{
+          paddingHorizontal: spacing.screenX,
+          paddingTop: spacing.screenY,
+          paddingBottom: spacing.innerGap,
+          gap: spacing.groupGap,
+        }}
+      >
+        <ScreenTitlePill label="Closet" />
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: spacing.groupGap,
+          }}
         >
-          <SymbolView name="arrow.up.arrow.down" size={11} tintColor={foreground} />
-          <Text variant="caption" className="text-ink dark:text-ink-dark">
-            {SORT_LABEL[sort]}
-          </Text>
-        </Pressable>
-        <CircularGlassButton
-          symbol="square.grid.2x2"
-          symbolSize={18}
-          foreground={foreground}
-          accessibilityLabel="Build outfit"
-          onPress={openBuildOutfit}
-        />
-        <CircularGlassButton
-          symbol="plus"
-          symbolSize={20}
-          foreground={foreground}
-          accessibilityLabel="Add item"
-          onPress={openNewItem}
-        />
+          <ChromePill
+            label={SORT_LABEL[sort]}
+            symbol="arrow.up.arrow.down"
+            foreground={foreground}
+            onPress={onCycleSort}
+            accessibilityLabel={`Sort: ${SORT_LABEL[sort]}`}
+          />
+          <FloatingChromeGroup spacing={6}>
+            <CircularGlassButton
+              symbol="square.grid.2x2"
+              symbolSize={symbolStyles.chromePrimary.size}
+              foreground={foreground}
+              accessibilityLabel="Build outfit"
+              onPress={openBuildOutfit}
+            />
+            <CircularGlassButton
+              symbol="plus"
+              symbolSize={symbolStyles.chromePrimary.size + 2}
+              foreground={foreground}
+              accessibilityLabel="Add item"
+              onPress={openNewItem}
+            />
+          </FloatingChromeGroup>
+        </View>
       </View>
+      <SearchAndFilterBar
+        searchText={searchText}
+        onChangeSearchText={onChangeSearchText}
+        activeFilterCount={activeFilterCount}
+        onOpenFilters={onOpenFilters}
+        foreground={foreground}
+      />
+      <CategoryRow
+        visibleCategories={visibleCategories}
+        active={activeCategory}
+        onSelect={onSelectCategory}
+      />
     </View>
+  );
+}
+
+function ListHeaderBlock({
+  activeTags,
+  onRemoveTag,
+  onClearTagFilters,
+}: {
+  activeTags: ActiveTag[];
+  onRemoveTag: (tag: ActiveTag) => void;
+  onClearTagFilters: () => void;
+}) {
+  return (
+    <ActiveFilterChips
+      tags={activeTags}
+      onRemove={onRemoveTag}
+      onClearAll={onClearTagFilters}
+    />
   );
 }
 
@@ -227,40 +318,33 @@ function SearchAndFilterBar({
   onChangeSearchText,
   activeFilterCount,
   onOpenFilters,
+  foreground,
 }: {
   searchText: string;
   onChangeSearchText: (next: string) => void;
   activeFilterCount: number;
   onOpenFilters: () => void;
+  foreground: string;
 }) {
   return (
-    <View className="flex-row items-center gap-2 px-6 pb-2">
+    <View
+      className="flex-row items-center"
+      style={{
+        paddingHorizontal: spacing.screenX,
+        paddingTop: spacing.innerGap,
+        paddingBottom: spacing.innerGap,
+        gap: spacing.groupGap,
+      }}
+    >
       <SearchField value={searchText} onChange={onChangeSearchText} />
-      <Pressable
+      <ChromePill
+        label="Filters"
+        symbol="line.3.horizontal.decrease.circle"
+        foreground={foreground}
+        count={activeFilterCount}
         onPress={onOpenFilters}
-        hitSlop={8}
-        className="h-10 px-4 rounded-full border border-line dark:border-line-dark items-center justify-center"
-      >
-        <Text variant="caption">{filterButtonLabel(activeFilterCount)}</Text>
-      </Pressable>
-    </View>
-  );
-}
-
-function CountBadge({
-  visibleCount,
-  totalCount,
-  isLoading,
-}: {
-  visibleCount: number;
-  totalCount: number;
-  isLoading: boolean;
-}) {
-  if (isLoading) return null;
-  if (totalCount === 0) return null;
-  return (
-    <View className="px-6 pt-2 pb-1">
-      <Text variant="caption">{countLabel(visibleCount, totalCount)}</Text>
+        accessibilityLabel={filterButtonLabel(activeFilterCount)}
+      />
     </View>
   );
 }
@@ -275,24 +359,26 @@ function CategoryRow({
   onSelect: (next: Category | "all") => void;
 }) {
   return (
-    <View className="border-b border-line dark:border-line-dark">
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={{ flexGrow: 0 }}
-        contentContainerStyle={{ paddingHorizontal: 24, paddingVertical: 8, gap: 8 }}
-      >
-        <Pill label="All" selected={active === "all"} onPress={() => onSelect("all")} />
-        {visibleCategories.map((category) => (
-          <Pill
-            key={category}
-            label={CATEGORY_LABELS[category]}
-            selected={active === category}
-            onPress={() => onSelect(category)}
-          />
-        ))}
-      </ScrollView>
-    </View>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={{ flexGrow: 0 }}
+      contentContainerStyle={{
+        paddingHorizontal: spacing.screenX,
+        paddingVertical: spacing.innerGap,
+        gap: spacing.groupGap,
+      }}
+    >
+      <Pill label="All" selected={active === "all"} onPress={() => onSelect("all")} />
+      {visibleCategories.map((category) => (
+        <Pill
+          key={category}
+          label={CATEGORY_LABELS[category]}
+          selected={active === category}
+          onPress={() => onSelect(category)}
+        />
+      ))}
+    </ScrollView>
   );
 }
 
@@ -301,50 +387,118 @@ function ClosetBody({
   items,
   hasAnyItems,
   hasActiveFilters,
+  chromeHeight,
+  bottomPadding,
+  isRefreshing,
+  onRefresh,
+  listHeader,
   onClearEverything,
 }: {
   isLoading: boolean;
   items: Item[];
   hasAnyItems: boolean;
   hasActiveFilters: boolean;
+  chromeHeight: number;
+  bottomPadding: number;
+  isRefreshing: boolean;
+  onRefresh: () => void;
+  listHeader: React.ReactNode;
   onClearEverything: () => void;
 }) {
   if (isLoading) {
-    return (
-      <View className="flex-1 items-center justify-center">
-        <ActivityIndicator />
-      </View>
-    );
+    return <ClosetGridSkeleton topPadding={chromeHeight + spacing.innerGap} />;
   }
   if (items.length === 0) {
     return (
-      <ClosetEmptyState
-        hasAnyItems={hasAnyItems}
-        hasActiveFilters={hasActiveFilters}
-        onClearFilters={onClearEverything}
-      />
+      <Animated.View
+        entering={FadeIn.duration(200)}
+        style={{ flex: 1, paddingTop: chromeHeight }}
+      >
+        <ClosetEmptyState
+          hasAnyItems={hasAnyItems}
+          hasActiveFilters={hasActiveFilters}
+          onClearFilters={onClearEverything}
+        />
+      </Animated.View>
     );
   }
-  return <ItemGrid items={items} />;
+  return (
+    <Animated.View entering={FadeIn.duration(200)} style={{ flex: 1 }}>
+      <ItemGrid
+        items={items}
+        chromeHeight={chromeHeight}
+        bottomPadding={bottomPadding}
+        listHeader={listHeader}
+        isRefreshing={isRefreshing}
+        onRefresh={onRefresh}
+      />
+    </Animated.View>
+  );
 }
 
-function ItemGrid({ items }: { items: Item[] }) {
+function ItemGrid({
+  items,
+  chromeHeight,
+  bottomPadding,
+  listHeader,
+  isRefreshing,
+  onRefresh,
+}: {
+  items: Item[];
+  chromeHeight: number;
+  bottomPadding: number;
+  listHeader: React.ReactNode;
+  isRefreshing: boolean;
+  onRefresh: () => void;
+}) {
   return (
     <View style={{ flex: 1 }}>
       <FlashList
         data={items}
         numColumns={2}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingVertical: 12 }}
-        renderItem={({ item }) => (
+        contentContainerStyle={{
+          paddingHorizontal: spacing.screenX - 4,
+          paddingTop: chromeHeight + spacing.innerGap,
+          paddingBottom: bottomPadding,
+        }}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            progressViewOffset={chromeHeight}
+          />
+        }
+        ListHeaderComponent={<>{listHeader}</>}
+        renderItem={({ item, index }) => (
           <View style={{ flex: 1, padding: 4 }}>
-            <ItemCard item={item} onPress={() => router.push(`/items/${item.id}`)} />
+            <ItemCard
+              item={item}
+              priority={loadPriorityFor(index)}
+              onPress={() => router.push(`/items/${item.id}`)}
+            />
           </View>
         )}
       />
     </View>
   );
 }
+
+const ABOVE_FOLD_CARD_COUNT = 6;
+
+const loadPriorityFor = (index: number): "high" | "normal" => {
+  if (index < ABOVE_FOLD_CARD_COUNT) return "high";
+  return "normal";
+};
+
+const effectiveCategoryFilter = (
+  filter: Category | "all",
+  visibleCategories: readonly Category[],
+): Category | "all" => {
+  if (filter === "all") return "all";
+  if (visibleCategories.includes(filter)) return filter;
+  return "all";
+};
 
 const filterByCategory = (items: Item[], filter: Category | "all"): Item[] => {
   if (filter === "all") return items;
@@ -373,14 +527,6 @@ const sortItems = (items: Item[], sort: SortMode): Item[] => {
 const filterButtonLabel = (activeCount: number): string => {
   if (activeCount === 0) return "Filters";
   return `Filters · ${activeCount}`;
-};
-
-const countLabel = (visibleCount: number, totalCount: number): string => {
-  if (visibleCount === totalCount) {
-    if (totalCount === 1) return "1 piece";
-    return `${totalCount} pieces`;
-  }
-  return `${visibleCount} of ${totalCount} pieces`;
 };
 
 const isFiltering = ({

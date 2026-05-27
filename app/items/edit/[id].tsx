@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { intentColors } from "~/lib/designTokens";
+import { useState } from "react";
 import { View, ScrollView, TextInput, ActivityIndicator } from "react-native";
 import { Image } from "expo-image";
 import { useLocalSearchParams, router } from "expo-router";
@@ -13,6 +14,7 @@ import { Disclosure } from "~/components/ui/Disclosure";
 import { KeyboardAvoider } from "~/components/ui/KeyboardAvoider";
 import { Section } from "~/features/closet/components/Section";
 import { ItemFormBar } from "~/features/closet/components/ItemFormBar";
+import { useBottomBarSpacing } from "~/components/ui/BottomBar";
 import { ItemAttributesForm } from "~/features/closet/components/ItemAttributesForm";
 import { WarmthDefaultsButton } from "~/features/closet/components/WarmthDefaultsButton";
 import { useItem, useUpdateItem, useReplaceItemPhoto } from "~/features/closet/hooks/useItems";
@@ -46,6 +48,7 @@ export default function EditItemScreen() {
   const update = useUpdateItem();
   const replacePhoto = useReplaceItemPhoto();
   const { visible: visibleCategories } = useCategoryPrefs();
+  const bottomBarSpacing = useBottomBarSpacing();
 
   const { data: signed } = useQuery({
     queryKey: ["item-signed", item?.id],
@@ -66,10 +69,14 @@ export default function EditItemScreen() {
   const [priceText, setPriceText] = useState("");
   const [currencyText, setCurrencyText] = useState("");
   const [purchasedOnText, setPurchasedOnText] = useState("");
-  const [hydrated, setHydrated] = useState(false);
+  const [hydratedId, setHydratedId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!item || hydrated) return;
+  // Hydrate form state from the loaded item the first time it lands (and
+  // again if the user opens a different item). Setting state during render
+  // — rather than from a useEffect — is React's preferred pattern when the
+  // new state is derived from a changed prop or query result.
+  if (item && hydratedId !== item.id) {
+    setHydratedId(item.id);
     setName(initialName(item.name));
     setCategory(item.category);
     setStyles(new Set(item.styles));
@@ -82,8 +89,7 @@ export default function EditItemScreen() {
     setPriceText(initialPriceText(item.price));
     setCurrencyText(initialCurrencyText(item.currency));
     setPurchasedOnText(initialPurchasedOnText(item.purchasedOn));
-    setHydrated(true);
-  }, [item, hydrated]);
+  }
 
   if (isLoading || !item) {
     return (
@@ -164,7 +170,11 @@ export default function EditItemScreen() {
     <Screen edges={["bottom"]}>
       <KeyboardAvoider className="flex-1">
       <ScrollView
-        contentContainerStyle={{ padding: 20, gap: 24, paddingBottom: 60 }}
+        contentContainerStyle={{
+          padding: 20,
+          gap: 24,
+          paddingBottom: bottomBarSpacing,
+        }}
         keyboardShouldPersistTaps="handled"
       >
         <View>
@@ -208,7 +218,7 @@ export default function EditItemScreen() {
             value={name}
             onChangeText={setName}
             placeholder="e.g. Black Levi's 501"
-            placeholderTextColor="#a8a29e"
+            placeholderTextColor={intentColors.placeholder}
             className="h-12 px-4 rounded-lg border border-line dark:border-line-dark text-ink dark:text-ink-dark"
           />
         </Section>

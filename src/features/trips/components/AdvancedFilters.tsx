@@ -4,6 +4,7 @@ import { SymbolView } from "expo-symbols";
 import { Text } from "~/components/ui/Text";
 import { Pill } from "~/components/ui/Pill";
 import { NumberField } from "./NumberField";
+import { intentColors } from "~/lib/designTokens";
 import { SEASONS, type Season } from "~/types/items";
 
 type Props = {
@@ -42,7 +43,7 @@ export function AdvancedFilters({
         <SymbolView
           name={chevronNameFor(expanded)}
           size={14}
-          tintColor="#a8a29e"
+          tintColor={intentColors.placeholder}
         />
       </Pressable>
 

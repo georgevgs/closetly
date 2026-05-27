@@ -1,12 +1,17 @@
-import { View, ScrollView, ActivityIndicator, Pressable } from "react-native";
+import { View, ScrollView, ActivityIndicator, Pressable, RefreshControl } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { SymbolView } from "expo-symbols";
 import * as Haptics from "expo-haptics";
 
 import { Screen } from "~/components/ui/Screen";
 import { Section } from "~/components/ui/Section";
 import { Text } from "~/components/ui/Text";
+import { Card } from "~/components/ui/Card";
+import { ScreenTitlePill } from "~/components/ui/ScreenTitlePill";
+import { intentColors, spacing } from "~/lib/designTokens";
 import { ItemCard } from "~/features/closet/components/ItemCard";
 import { useSignedItems } from "~/features/closet/hooks/useSignedItems";
 import { useWeather, type WeatherSnapshot } from "~/features/weather/useWeather";
@@ -51,6 +56,16 @@ export default function TodayScreen() {
     () => preferredStylesAsSet(preferredStylesList),
     [preferredStylesList],
   );
+  const [chromeHeight, setChromeHeight] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await queryClient.invalidateQueries();
+    setIsRefreshing(false);
+  };
 
   const anchorCandidates = useMemo(() => {
     if (!items) return [];
@@ -64,7 +79,19 @@ export default function TodayScreen() {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+      <ScrollView
+        contentContainerStyle={{
+          paddingTop: chromeHeight + spacing.innerGap,
+          paddingBottom: insets.bottom + 80,
+        }}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            progressViewOffset={chromeHeight}
+          />
+        }
+      >
         <Greeting weather={weather} />
         <LocationPrompt />
         <HomeBody
@@ -78,13 +105,29 @@ export default function TodayScreen() {
           itemWearCounts={itemWearCounts}
         />
       </ScrollView>
+      <View
+        pointerEvents="box-none"
+        onLayout={(event) => setChromeHeight(event.nativeEvent.layout.height)}
+        style={{ position: "absolute", top: 0, left: 0, right: 0 }}
+      >
+        <View
+          className="flex-row items-center"
+          style={{
+            paddingHorizontal: spacing.screenX,
+            paddingTop: spacing.screenY,
+            paddingBottom: spacing.innerGap,
+          }}
+        >
+          <ScreenTitlePill label="Today" />
+        </View>
+      </View>
     </Screen>
   );
 }
 
 function Greeting({ weather }: { weather: WeatherSnapshot | null | undefined }) {
   return (
-    <View className="px-6 pt-4">
+    <View style={{ paddingHorizontal: spacing.screenX, paddingTop: spacing.screenY }}>
       <Text variant="caption" className="uppercase tracking-widest">
         {greetingText()}
         {weatherSuffix(weather)}
@@ -180,19 +223,18 @@ function ReadyState({
 
 function BuildOutfitPrompt() {
   return (
-    <View className="px-6 mt-6">
-      <Pressable
-        onPress={openBuildOutfit}
-        className="rounded-xl border border-line dark:border-line-dark p-4 flex-row items-center"
-      >
-        <SymbolView name="square.grid.2x2" size={20} tintColor="#a8a29e" />
-        <View className="ml-3 flex-1">
-          <Text variant="headline">Build it yourself</Text>
-          <Text variant="caption" className="mt-0.5">
-            Pick a top, bottom and shoes — Closetly scores the combo as you go.
-          </Text>
-        </View>
-        <SymbolView name="chevron.right" size={14} tintColor="#a8a29e" />
+    <View style={{ paddingHorizontal: spacing.screenX, marginTop: spacing.stackMd }}>
+      <Pressable onPress={openBuildOutfit}>
+        <Card padding="md" className="flex-row items-center">
+          <SymbolView name="square.grid.2x2" size={20} tintColor={intentColors.placeholder} />
+          <View className="ml-3 flex-1">
+            <Text variant="headline">Build it yourself</Text>
+            <Text variant="caption" className="mt-0.5">
+              Pick a top, bottom and shoes — Closetly scores the combo as you go.
+            </Text>
+          </View>
+          <SymbolView name="chevron.right" size={14} tintColor={intentColors.placeholder} />
+        </Card>
       </Pressable>
     </View>
   );
@@ -234,8 +276,8 @@ function IncompleteCloset({ missing }: { missing: Category[] }) {
 
 function ColdStartCard({ title, message }: { title: string; message: string }) {
   return (
-    <View className="px-6 mt-12">
-      <View className="rounded-xl border border-line dark:border-line-dark p-6">
+    <View style={{ paddingHorizontal: spacing.screenX, marginTop: 48 }}>
+      <Card padding="lg">
         <Text variant="headline" className="mb-2">
           {title}
         </Text>
@@ -250,7 +292,7 @@ function ColdStartCard({ title, message }: { title: string; message: string }) {
             Add an item
           </Text>
         </Pressable>
-      </View>
+      </Card>
     </View>
   );
 }

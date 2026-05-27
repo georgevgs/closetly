@@ -15,15 +15,16 @@ export type UseLocationPermissionResult = {
 export function useLocationPermission(): UseLocationPermissionResult {
   const [status, setStatus] = useState<LocationPermissionStatus>("loading");
 
-  const refresh = useCallback(async () => {
-    const next = await readStatus();
-    setStatus(next);
-    return next;
-  }, []);
-
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    let cancelled = false;
+    (async () => {
+      const next = await readStatus();
+      if (!cancelled) setStatus(next);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const request = useCallback(async (): Promise<LocationPermissionStatus> => {
     const current = await Location.getForegroundPermissionsAsync();

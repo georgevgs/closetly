@@ -5,20 +5,15 @@
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
-    "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web",
     "lint": "expo lint",
     "test": "bun test ./__tests__",
     "icons": "bun run scripts/generate-icons.ts",
     "build:dev:ios": "eas build --profile development --platform ios",
     "build:dev:device:ios": "eas build --profile development-device --platform ios",
-    "build:dev:android": "eas build --profile development --platform android",
     "build:preview:ios": "eas build --profile preview --platform ios",
-    "build:preview:android": "eas build --profile preview --platform android",
-    "build:production": "eas build --profile production --platform all",
-    "submit:ios": "eas submit --profile production --platform ios",
-    "submit:android": "eas submit --profile production --platform android"
+    "build:production": "eas build --profile production --platform ios",
+    "submit:ios": "eas submit --profile production --platform ios"
   },
   "dependencies": {
     "@gorhom/bottom-sheet": "^5.2.14",

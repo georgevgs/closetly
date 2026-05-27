@@ -1,3 +1,4 @@
+import { intentColors } from "~/lib/designTokens";
 import { ActivityIndicator, View } from "react-native";
 import { Image } from "expo-image";
 import { SymbolView } from "expo-symbols";
@@ -41,7 +42,7 @@ function EmptyPreview() {
       className="rounded-xl border-2 border-dashed border-line dark:border-line-dark items-center justify-center"
       style={{ aspectRatio: 1 }}
     >
-      <SymbolView name="camera" size={32} tintColor="#a8a29e" />
+      <SymbolView name="camera" size={32} tintColor={intentColors.placeholder} />
       <Text variant="caption" className="mt-2">
         Add a photo of the piece
       </Text>

@@ -1,4 +1,4 @@
-import { View, ScrollView, Pressable, ActivityIndicator, Alert } from "react-native";
+import { View, ScrollView, Pressable, Alert } from "react-native";
 import { Image } from "expo-image";
 import { Stack, useLocalSearchParams, router } from "expo-router";
 import { SymbolView } from "expo-symbols";
@@ -9,9 +9,10 @@ import { toast } from "sonner-native";
 import { Screen } from "~/components/ui/Screen";
 import { Text } from "~/components/ui/Text";
 import { Button } from "~/components/ui/Button";
-import { Pill } from "~/components/ui/Pill";
+import { Tag } from "~/components/ui/Tag";
 import { GlassSurface } from "~/components/ui/GlassSurface";
 import { useItem, useDeleteItem } from "~/features/closet/hooks/useItems";
+import { ItemDetailSkeleton } from "~/features/closet/components/ItemDetailSkeleton";
 import { useMarkWashed } from "~/features/closet/hooks/useMarkWashed";
 import { signFirst } from "~/features/closet/itemPicker";
 import { useQuery } from "@tanstack/react-query";
@@ -36,8 +37,8 @@ export default function ItemDetail() {
 
   if (isLoading) {
     return (
-      <Screen className="items-center justify-center">
-        <ActivityIndicator />
+      <Screen>
+        <ItemDetailSkeleton />
       </Screen>
     );
   }
@@ -62,7 +63,10 @@ export default function ItemDetail() {
           ),
         }}
       />
-      <ScrollView contentContainerStyle={{ padding: 16, gap: 20 }}>
+      <ScrollView
+        contentContainerStyle={{ padding: 16, gap: 20 }}
+        contentInsetAdjustmentBehavior="automatic"
+      >
         <View className="rounded-xl overflow-hidden" style={{ aspectRatio: 1 }}>
           <Image source={{ uri: display.photo_url }} style={{ flex: 1 }} contentFit="cover" />
         </View>
@@ -99,17 +103,17 @@ export default function ItemDetail() {
           </Text>
           <View className="flex-row flex-wrap gap-2">
             {display.styles.map((style) => (
-              <Pill key={style} label={style} />
+              <Tag key={style} label={style} />
             ))}
             {display.seasons.map((season) => (
-              <Pill key={season} label={season} />
+              <Tag key={season} label={season} />
             ))}
             {display.occasions.map((occasion) => (
-              <Pill key={occasion} label={occasion} />
+              <Tag key={occasion} label={occasion} />
             ))}
-            <Pill label={`formality ${display.formality}`} />
-            <Pill label={`warmth ${display.warmth}`} />
-            {display.pattern !== "solid" && <Pill label={display.pattern} />}
+            <Tag label={`formality ${display.formality}`} />
+            <Tag label={`warmth ${display.warmth}`} />
+            {display.pattern !== "solid" && <Tag label={display.pattern} />}
           </View>
         </View>
 
@@ -171,8 +175,8 @@ function PriceSection({ item }: { item: Item }) {
         Purchase
       </Text>
       <View className="flex-row flex-wrap gap-2">
-        {item.price !== null && <Pill label={formatPrice(item.price, item.currency)} />}
-        {item.purchasedOn !== null && <Pill label={`bought ${item.purchasedOn}`} />}
+        {item.price !== null && <Tag label={formatPrice(item.price, item.currency)} />}
+        {item.purchasedOn !== null && <Tag label={`bought ${item.purchasedOn}`} />}
       </View>
     </View>
   );

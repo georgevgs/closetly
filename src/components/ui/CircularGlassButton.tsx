@@ -1,7 +1,7 @@
-import { Pressable } from "react-native";
 import { SymbolView, type SymbolViewProps } from "expo-symbols";
 
 import { GlassSurface } from "./GlassSurface";
+import { PressableScale } from "./PressableScale";
 
 const SIZE = 44;
 const RADIUS = SIZE / 2;
@@ -22,7 +22,7 @@ export function CircularGlassButton({
   onPress,
 }: Props) {
   return (
-    <Pressable
+    <PressableScale
       onPress={onPress}
       hitSlop={12}
       accessibilityRole="button"
@@ -47,6 +47,6 @@ export function CircularGlassButton({
           weight="semibold"
         />
       </GlassSurface>
-    </Pressable>
+    </PressableScale>
   );
 }

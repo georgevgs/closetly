@@ -58,7 +58,15 @@ function AuthGate() {
       />
       <Stack.Screen
         name="items/[id]"
-        options={{ headerShown: true, headerBackTitle: "Closet", title: "Item" }}
+        options={{
+          headerShown: true,
+          headerBackTitle: "Closet",
+          title: "Item",
+          headerLargeTitle: true,
+          headerTransparent: true,
+          headerBlurEffect: "regular",
+          headerLargeTitleShadowVisible: false,
+        }}
       />
       <Stack.Screen
         name="items/edit/[id]"
@@ -74,7 +82,15 @@ function AuthGate() {
       />
       <Stack.Screen
         name="trips/[id]"
-        options={{ headerShown: true, headerBackTitle: "Trips", title: "Trip" }}
+        options={{
+          headerShown: true,
+          headerBackTitle: "Trips",
+          title: "Trip",
+          headerLargeTitle: true,
+          headerTransparent: true,
+          headerBlurEffect: "regular",
+          headerLargeTitleShadowVisible: false,
+        }}
       />
       <Stack.Screen
         name="trips/edit/[id]"

@@ -9,9 +9,10 @@ import {
 
 import { Text } from "~/components/ui/Text";
 import { ItemCard } from "~/features/closet/components/ItemCard";
+import { intentColors } from "~/lib/designTokens";
 import type { Category, Item } from "~/types/items";
 
-const SNAP_POINTS = ["85%"];
+const SNAP_POINTS = ["55%", "92%"];
 const COLUMN_COUNT = 3;
 
 const SLOT_LABELS: Record<Category, string> = {
@@ -105,8 +106,11 @@ function PickerHeader({
     <View className="flex-row items-center justify-between px-4 py-3 border-b border-line dark:border-line-dark">
       <Text variant="title">{titleFor(slot)}</Text>
       {hasCurrent && (
-        <Pressable onPress={onRemove} hitSlop={8}>
-          <Text variant="caption" className="underline text-red-600">
+        <Pressable onPress={onRemove} hitSlop={12}>
+          <Text
+            variant="caption"
+            className="underline text-destructive dark:text-destructive-dark"
+          >
             Remove
           </Text>
         </Pressable>
@@ -128,7 +132,7 @@ function SearchBar({
         value={value}
         onChangeText={onChangeText}
         placeholder="Search by name or brand"
-        placeholderTextColor="#a8a29e"
+        placeholderTextColor={intentColors.placeholder}
         className="h-10 px-4 rounded-full border border-line dark:border-line-dark text-ink dark:text-ink-dark"
         returnKeyType="search"
       />

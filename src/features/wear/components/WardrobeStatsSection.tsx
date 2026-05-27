@@ -2,6 +2,8 @@ import { useMemo } from "react";
 import { View } from "react-native";
 import { Image } from "expo-image";
 import { Text } from "~/components/ui/Text";
+import { Card } from "~/components/ui/Card";
+import { radii } from "~/lib/designTokens";
 import { useSignedItems } from "~/features/closet/hooks/useSignedItems";
 import { useItemWearCounts } from "~/features/wear/hooks/useItemWearCounts";
 import {
@@ -39,14 +41,14 @@ export function WardrobeStatsSection({ userId }: { userId: string | undefined })
 
 function TotalsRow({ stats }: { stats: WardrobeStats }) {
   return (
-    <View className="rounded-xl border border-line dark:border-line-dark p-4">
+    <Card padding="md">
       <Text variant="caption" className="uppercase tracking-widest">
         Closet
       </Text>
       <Text variant="title">{itemsLabel(stats.totalItems)}</Text>
       <ValueLine values={stats.valuesByCurrency} />
       <CostPerWearLine averages={stats.averageCostPerWear} />
-    </View>
+    </Card>
   );
 }
 
@@ -99,7 +101,10 @@ function MostWornBlock({
 
 function MostWornRow({ item, wears }: { item: Item; wears: number }) {
   return (
-    <View className="flex-row items-center rounded-lg border border-line dark:border-line-dark p-2">
+    <View
+      style={{ borderRadius: radii.row, padding: 8 }}
+      className="flex-row items-center border border-line dark:border-line-dark bg-canvas dark:bg-canvas-dark"
+    >
       <Thumbnail item={item} />
       <View className="flex-1 ml-3">
         <Text variant="body" numberOfLines={1}>
@@ -124,14 +129,14 @@ function NeverWornBlock({
       <Text variant="label" className="mb-2">
         Never worn
       </Text>
-      <View className="rounded-lg border border-line dark:border-line-dark p-3">
+      <Card padding="sm">
         <Text variant="body">{neverWornHeading(entries.count)}</Text>
         <View className="flex-row mt-3" style={{ gap: 6 }}>
           {entries.sample.map((item) => (
             <Thumbnail key={item.id} item={item} />
           ))}
         </View>
-      </View>
+      </Card>
     </View>
   );
 }

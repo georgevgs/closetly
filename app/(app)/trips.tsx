@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
-import { View, ScrollView } from "react-native";
+import { View, ScrollView, RefreshControl } from "react-native";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner-native";
 
 import { Screen } from "~/components/ui/Screen";
 import { Text } from "~/components/ui/Text";
+import { ScreenTitlePill } from "~/components/ui/ScreenTitlePill";
 import { useAuth } from "~/features/auth/context";
 import { useSignedItems } from "~/features/closet/hooks/useSignedItems";
 import { buildCapsule } from "~/features/trips/capsule";
@@ -12,6 +14,8 @@ import { SavedTripsSection } from "~/features/trips/components/SavedTripsSection
 import { TripPlannerForm } from "~/features/trips/components/TripPlannerForm";
 import { CapsulePreview } from "~/features/trips/components/CapsulePreview";
 import { SaveTripBar } from "~/features/trips/components/SaveTripBar";
+import { useBottomBarSpacing } from "~/components/ui/BottomBar";
+import { spacing } from "~/lib/designTokens";
 import { useDebouncedValue } from "~/hooks/useDebouncedValue";
 import { calendarDaysBetween } from "~/lib/dates";
 import { type Season } from "~/types/items";
@@ -25,6 +29,16 @@ export default function TripsScreen() {
   const { session } = useAuth();
   const { data: items } = useSignedItems(session?.user.id);
   const createTrip = useCreateTrip();
+  const bottomBarSpacing = useBottomBarSpacing();
+  const [chromeHeight, setChromeHeight] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const queryClient = useQueryClient();
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await queryClient.invalidateQueries();
+    setIsRefreshing(false);
+  };
 
   const initialStart = useMemo(() => atMidnight(new Date()), []);
   const initialEnd = useMemo(
@@ -125,14 +139,22 @@ export default function TripsScreen() {
   return (
     <Screen edges={["top", "left", "right"]}>
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 32 }}
+        contentContainerStyle={{
+          paddingHorizontal: spacing.screenX,
+          paddingTop: chromeHeight + spacing.innerGap,
+          paddingBottom: bottomBarSpacing,
+        }}
         keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            progressViewOffset={chromeHeight}
+          />
+        }
       >
-        <View className="pt-4">
-          <Text variant="display">Trips</Text>
-          <Text variant="caption" className="mt-1">
-            Pack a capsule that mixes and matches.
-          </Text>
+        <View>
+          <Text variant="caption">Pack a capsule that mixes and matches.</Text>
         </View>
 
         <SavedTripsSection userId={session?.user.id} />
@@ -159,6 +181,23 @@ export default function TripsScreen() {
 
         {capsule && <CapsulePreview capsule={capsule} />}
       </ScrollView>
+
+      <View
+        pointerEvents="box-none"
+        onLayout={(event) => setChromeHeight(event.nativeEvent.layout.height)}
+        style={{ position: "absolute", top: 0, left: 0, right: 0 }}
+      >
+        <View
+          className="flex-row items-center"
+          style={{
+            paddingHorizontal: spacing.screenX,
+            paddingTop: spacing.screenY,
+            paddingBottom: spacing.innerGap,
+          }}
+        >
+          <ScreenTitlePill label="Trips" />
+        </View>
+      </View>
 
       <SaveTripBar
         onSave={saveTrip}

@@ -3,6 +3,7 @@ import { Pressable, View } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { Text } from "~/components/ui/Text";
+import { Card } from "~/components/ui/Card";
 import { useLocationPermission } from "~/features/weather/hooks/useLocationPermission";
 import { weatherKeys } from "~/features/weather/useWeather";
 
@@ -24,7 +25,7 @@ export function LocationPrompt() {
   const handleDismiss = () => setDismissedThisSession(true);
 
   return (
-    <View className="mx-6 mt-4 rounded-xl border border-line dark:border-line-dark p-4">
+    <Card padding="md" className="mx-6 mt-4">
       <Text variant="headline">Match outfits to today&apos;s weather</Text>
       <Text variant="caption" className="mt-1 leading-5">
         Closetly checks the local forecast so it can suggest warmer or lighter
@@ -46,6 +47,6 @@ export function LocationPrompt() {
           <Text variant="body">Not now</Text>
         </Pressable>
       </View>
-    </View>
+    </Card>
   );
 }

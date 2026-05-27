@@ -1,7 +1,10 @@
-import { View, Pressable } from "react-native";
+import { View } from "react-native";
 import { Image } from "expo-image";
 import { SymbolView, type SymbolViewProps } from "expo-symbols";
 import { Text } from "~/components/ui/Text";
+import { Card } from "~/components/ui/Card";
+import { PressableScale } from "~/components/ui/PressableScale";
+import { intentColors, scoreToneColors } from "~/lib/designTokens";
 import type { OutfitSuggestion } from "~/lib/outfit/combinator";
 import type { Item } from "~/types/items";
 
@@ -21,7 +24,7 @@ export function OutfitCard({
   onDismiss?: () => void;
 }) {
   return (
-    <View className="rounded-xl border border-line dark:border-line-dark p-4 bg-white dark:bg-[#1a1816]">
+    <Card padding="md">
       <View className="flex-row justify-between items-start mb-3">
         <View>
           <Text variant="caption" className="uppercase tracking-widest">
@@ -59,8 +62,11 @@ export function OutfitCard({
           >
             <Image
               source={{ uri: imageSource(item) }}
+              recyclingKey={imageSource(item)}
               style={{ flex: 1 }}
               contentFit="cover"
+              cachePolicy="memory-disk"
+              transition={150}
             />
           </View>
         ))}
@@ -91,7 +97,7 @@ export function OutfitCard({
           ))}
         </View>
       )}
-    </View>
+    </Card>
   );
 }
 
@@ -99,11 +105,21 @@ function WearButton({ worn, onPress }: { worn?: boolean; onPress: () => void }) 
   const icon = pickWearIcon(worn);
   const tint = pickWearTint(worn);
   return (
-    <Pressable onPress={onPress} hitSlop={12}>
+    <PressableScale
+      onPress={onPress}
+      hitSlop={12}
+      accessibilityRole="button"
+      accessibilityLabel={wearAccessibilityLabel(worn)}
+    >
       <SymbolView name={icon} size={22} tintColor={tint} />
-    </Pressable>
+    </PressableScale>
   );
 }
+
+const wearAccessibilityLabel = (worn: boolean | undefined): string => {
+  if (worn) return "Marked as worn today";
+  return "Wear today";
+};
 
 const pickWearIcon = (worn?: boolean): SymbolViewProps["name"] => {
   if (worn) return "checkmark.circle.fill";
@@ -111,15 +127,20 @@ const pickWearIcon = (worn?: boolean): SymbolViewProps["name"] => {
 };
 
 const pickWearTint = (worn?: boolean): string => {
-  if (worn) return "#5a7a3b";
-  return "#78716c";
+  if (worn) return intentColors.success;
+  return intentColors.muted;
 };
 
 function DismissButton({ onPress }: { onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} hitSlop={12}>
-      <SymbolView name="xmark.circle" size={22} tintColor="#78716c" />
-    </Pressable>
+    <PressableScale
+      onPress={onPress}
+      hitSlop={12}
+      accessibilityRole="button"
+      accessibilityLabel="Dismiss suggestion"
+    >
+      <SymbolView name="xmark.circle" size={22} tintColor={intentColors.muted} />
+    </PressableScale>
   );
 }
 
@@ -127,11 +148,22 @@ function SaveButton({ saved, onPress }: { saved?: boolean; onPress: () => void }
   const icon = pickHeartIcon(saved);
   const tint = pickHeartTint(saved);
   return (
-    <Pressable onPress={onPress} hitSlop={12} className="ml-1">
+    <PressableScale
+      onPress={onPress}
+      hitSlop={12}
+      accessibilityRole="button"
+      accessibilityLabel={saveAccessibilityLabel(saved)}
+      className="ml-1"
+    >
       <SymbolView name={icon} size={22} tintColor={tint} />
-    </Pressable>
+    </PressableScale>
   );
 }
+
+const saveAccessibilityLabel = (saved: boolean | undefined): string => {
+  if (saved) return "Remove from favorites";
+  return "Save to favorites";
+};
 
 const pickHeartIcon = (saved?: boolean): SymbolViewProps["name"] => {
   if (saved) return "heart.fill";
@@ -139,8 +171,8 @@ const pickHeartIcon = (saved?: boolean): SymbolViewProps["name"] => {
 };
 
 const pickHeartTint = (saved?: boolean): string => {
-  if (saved) return "#a85a3b";
-  return "#78716c";
+  if (saved) return intentColors.destructive;
+  return intentColors.muted;
 };
 
 type ChipTone = "ok" | "mid" | "low";
@@ -164,9 +196,9 @@ const chipToneFor = (value: number): ChipTone => {
 };
 
 const chipBackground = (tone: ChipTone): string => {
-  if (tone === "ok") return "#e5edd8";
-  if (tone === "mid") return "#f1e6d8";
-  return "#f0d9d3";
+  if (tone === "ok") return scoreToneColors.okBackground;
+  if (tone === "mid") return scoreToneColors.midBackground;
+  return scoreToneColors.lowBackground;
 };
 
 const imageSource = (item: Item): string => {

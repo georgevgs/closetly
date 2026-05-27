@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { intentColors } from "~/lib/designTokens";
+import { useRef, useState } from "react";
 import {
   View,
   ScrollView,
@@ -20,6 +21,7 @@ import { Disclosure } from "~/components/ui/Disclosure";
 import { KeyboardAvoider } from "~/components/ui/KeyboardAvoider";
 import { Section } from "~/features/closet/components/Section";
 import { ItemFormBar } from "~/features/closet/components/ItemFormBar";
+import { useBottomBarSpacing } from "~/components/ui/BottomBar";
 import { ItemAttributesForm } from "~/features/closet/components/ItemAttributesForm";
 import { WarmthDefaultsButton } from "~/features/closet/components/WarmthDefaultsButton";
 import { ItemPhotoPreview } from "~/features/closet/components/ItemPhotoPreview";
@@ -86,6 +88,7 @@ const ordinalLabel = (index: number): string => {
 export default function NewItemScreen() {
   const create = useCreateItem();
   const { visible: visibleCategories } = useCategoryPrefs();
+  const bottomBarSpacing = useBottomBarSpacing();
   const initialCategory = pickInitialCategory(visibleCategories);
   const initialWarmth = defaultWarmthFor(initialCategory);
   const initialFormality = defaultFormalityFor(initialCategory);
@@ -113,10 +116,11 @@ export default function NewItemScreen() {
   // Switching category re-seats the smart defaults for any field the user
   // hasn't explicitly touched. So a user adding a dress sees formality 4 and
   // warmth 2 without ever opening the More details panel.
-  useEffect(() => {
-    if (!warmthTouched) setWarmth(defaultWarmthFor(category));
-    if (!formalityTouched) setFormality(defaultFormalityFor(category));
-  }, [category, warmthTouched, formalityTouched]);
+  const selectCategory = (next: Category) => {
+    setCategory(next);
+    if (!warmthTouched) setWarmth(defaultWarmthFor(next));
+    if (!formalityTouched) setFormality(defaultFormalityFor(next));
+  };
 
   const [analyzing, setAnalyzing] = useState(false);
   const [trimming, setTrimming] = useState(false);
@@ -272,7 +276,7 @@ export default function NewItemScreen() {
 
   const colorsAccessory = (): React.ReactNode => {
     if (analyzing) return <ActivityIndicator size="small" />;
-    if (autoFilled) return <SymbolView name="sparkles" size={16} tintColor="#a8a29e" />;
+    if (autoFilled) return <SymbolView name="sparkles" size={16} tintColor={intentColors.placeholder} />;
     return null;
   };
 
@@ -280,7 +284,11 @@ export default function NewItemScreen() {
     <Screen edges={["bottom"]}>
       <KeyboardAvoider className="flex-1">
       <ScrollView
-        contentContainerStyle={{ padding: 20, gap: 24, paddingBottom: 60 }}
+        contentContainerStyle={{
+          padding: 20,
+          gap: 24,
+          paddingBottom: bottomBarSpacing,
+        }}
         keyboardShouldPersistTaps="handled"
       >
         {/* Photo */}
@@ -339,7 +347,7 @@ export default function NewItemScreen() {
             value={name}
             onChangeText={setName}
             placeholder="e.g. Black Levi's 501"
-            placeholderTextColor="#a8a29e"
+            placeholderTextColor={intentColors.placeholder}
             className="h-12 px-4 rounded-lg border border-line dark:border-line-dark text-ink dark:text-ink-dark"
           />
         </Section>
@@ -352,7 +360,7 @@ export default function NewItemScreen() {
                 key={categoryOption}
                 label={categoryOption}
                 selected={category === categoryOption}
-                onPress={() => setCategory(categoryOption)}
+                onPress={() => selectCategory(categoryOption)}
               />
             ))}
           </View>

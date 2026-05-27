@@ -1,6 +1,7 @@
-import { Pressable, View } from "react-native";
-import { Image } from "expo-image";
+import { View } from "react-native";
+import { Image, type ImageProps } from "expo-image";
 import { Text } from "~/components/ui/Text";
+import { PressableScale } from "~/components/ui/PressableScale";
 import type { Item, Category } from "~/types/items";
 import { cn } from "~/lib/utils";
 
@@ -15,34 +16,49 @@ const CATEGORY_FALLBACK: Record<Category, string> = {
   accessory: "Accessory",
 };
 
+type ImagePriority = NonNullable<ImageProps["priority"]>;
+
 type Props = {
   item: Item;
   onPress?: () => void;
   selected?: boolean;
   size?: "sm" | "md" | "lg";
+  priority?: ImagePriority;
 };
 
 const aspect = { sm: 1, md: 1, lg: 1 };
 
-export function ItemCard({ item, onPress, selected, size = "md" }: Props) {
+export function ItemCard({
+  item,
+  onPress,
+  selected,
+  size = "md",
+  priority = "normal",
+}: Props) {
   const previewUri = previewImageUri(item);
   const displayLabel = labelFor(item);
   const showLabel = displayLabel !== null || item.colors[0] !== undefined;
 
+  const accessibilityLabel = captionLabel(displayLabel, item.category);
   return (
-    <Pressable
+    <PressableScale
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       className={cn(
-        "rounded-lg overflow-hidden bg-white dark:bg-[#1a1816] border",
+        "rounded-lg overflow-hidden bg-canvas dark:bg-canvas-dark border",
         cardBorderClass(selected),
       )}
       style={{ aspectRatio: aspect[size] }}
     >
       <Image
         source={{ uri: previewUri }}
+        recyclingKey={previewUri}
         style={{ flex: 1 }}
         contentFit="cover"
         transition={150}
+        cachePolicy="memory-disk"
+        priority={priority}
       />
       {showLabel && (
         <View className="absolute bottom-0 left-0 right-0 px-2 py-1.5 bg-canvas/85 dark:bg-canvas-dark/85 flex-row items-center gap-2">
@@ -57,7 +73,7 @@ export function ItemCard({ item, onPress, selected, size = "md" }: Props) {
           </Text>
         </View>
       )}
-    </Pressable>
+    </PressableScale>
   );
 }
 

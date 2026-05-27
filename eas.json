@@ -12,9 +12,6 @@
         "simulator": true,
         "resourceClass": "m-medium"
       },
-      "android": {
-        "buildType": "apk"
-      },
       "env": {
         "APP_ENV": "development"
       }
@@ -33,9 +30,6 @@
         "simulator": false,
         "resourceClass": "m-medium"
       },
-      "android": {
-        "buildType": "apk"
-      },
       "env": {
         "APP_ENV": "preview"
       }
@@ -47,9 +41,6 @@
       "ios": {
         "resourceClass": "m-medium"
       },
-      "android": {
-        "buildType": "app-bundle"
-      },
       "env": {
         "APP_ENV": "production"
       }
@@ -60,11 +51,6 @@
       "ios": {
         "ascAppId": "REPLACE_WITH_APP_STORE_CONNECT_APP_ID",
         "appleTeamId": "REPLACE_WITH_APPLE_TEAM_ID"
-      },
-      "android": {
-        "serviceAccountKeyPath": "./google-service-account.json",
-        "track": "internal",
-        "releaseStatus": "draft"
       }
     }
   }

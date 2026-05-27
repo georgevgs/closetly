@@ -1,7 +1,10 @@
-import { Alert, Pressable, View } from "react-native";
+import { Alert, View } from "react-native";
 import { router } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { Text } from "~/components/ui/Text";
+import { PressableScale } from "~/components/ui/PressableScale";
+import { SwipeToDelete } from "~/components/ui/SwipeToDelete";
+import { intentColors, radii } from "~/lib/designTokens";
 import { useTrips, useDeleteTrip, type SavedTrip } from "~/features/trips/hooks/useTrips";
 import { parseDateOnly } from "~/lib/dates";
 
@@ -52,25 +55,32 @@ function SavedTripRow({
   onDelete: () => void;
 }) {
   return (
-    <Pressable
-      onPress={onOpen}
-      accessibilityRole="button"
-      accessibilityLabel={`Open trip ${trip.name}`}
-      className="flex-row items-center rounded-lg border border-line dark:border-line-dark p-3"
+    <SwipeToDelete
+      onDelete={onDelete}
+      accessibilityLabel={`Delete trip ${trip.name}`}
     >
-      <View className="flex-1">
-        <Text variant="body" numberOfLines={1}>
-          {trip.name}
-        </Text>
-        <Text variant="caption" numberOfLines={1}>
-          {tripSummary(trip)}
-        </Text>
-      </View>
-      <Pressable onPress={onDelete} hitSlop={12} className="px-2">
-        <SymbolView name="trash" size={18} tintColor="#a85a3b" />
-      </Pressable>
-      <SymbolView name="chevron.right" size={14} tintColor="#a8a29e" />
-    </Pressable>
+      <PressableScale
+        onPress={onOpen}
+        accessibilityRole="button"
+        accessibilityLabel={`Open trip ${trip.name}`}
+        style={{ borderRadius: radii.row, padding: 12 }}
+        className="flex-row items-center border border-line dark:border-line-dark bg-canvas dark:bg-canvas-dark"
+      >
+        <View className="flex-1">
+          <Text variant="body" numberOfLines={1}>
+            {trip.name}
+          </Text>
+          <Text variant="caption" numberOfLines={1}>
+            {tripSummary(trip)}
+          </Text>
+        </View>
+        <SymbolView
+          name="chevron.right"
+          size={14}
+          tintColor={intentColors.placeholder}
+        />
+      </PressableScale>
+    </SwipeToDelete>
   );
 }
 

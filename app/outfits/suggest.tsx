@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
-import { ActivityIndicator, ScrollView, View } from "react-native";
+import { ActivityIndicator, RefreshControl, ScrollView, View } from "react-native";
+import { useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams } from "expo-router";
 
 import { Screen } from "~/components/ui/Screen";
 import { Text } from "~/components/ui/Text";
 import { Pill } from "~/components/ui/Pill";
-import { GlassSurface } from "~/components/ui/GlassSurface";
+import { Card } from "~/components/ui/Card";
 import { useAuth } from "~/features/auth/context";
 import { useSignedItems } from "~/features/closet/hooks/useSignedItems";
 import { usePairAffinity } from "~/features/outfits/hooks/usePairAffinity";
@@ -43,6 +44,14 @@ export default function SuggestScreen() {
   const { data: weather } = useWeather();
   const actions = useOutfitActions(weather);
   const [targetOccasion, setTargetOccasion] = useState<Occasion | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const queryClient = useQueryClient();
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await queryClient.invalidateQueries();
+    setIsRefreshing(false);
+  };
 
   const anchor = items?.find((item) => item.id === anchorId);
   const { suggestions, isComputing } = useDeferredSuggestions(
@@ -89,7 +98,12 @@ export default function SuggestScreen() {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
+      <ScrollView
+        contentContainerStyle={{ padding: 16, gap: 12 }}
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />
+        }
+      >
         <AnchorHeader anchor={anchor} weather={weather} />
         <OccasionPicker selected={targetOccasion} onSelect={setTargetOccasion} />
         {!isComputing && (
@@ -144,10 +158,7 @@ function AnchorHeader({
   weather: WeatherSnapshot | null | undefined;
 }) {
   return (
-    <GlassSurface
-      style={{ borderRadius: 20, padding: 16, overflow: "hidden" }}
-      fallbackClassName="bg-canvas dark:bg-canvas-dark border border-line/40 dark:border-line-dark/40 rounded-2xl"
-    >
+    <Card padding="md">
       <Text variant="caption" className="uppercase tracking-widest">
         Anchored to
       </Text>
@@ -157,7 +168,7 @@ function AnchorHeader({
           {Math.round(weather.tempC)}°C · {weather.summary}
         </Text>
       )}
-    </GlassSurface>
+    </Card>
   );
 }
 

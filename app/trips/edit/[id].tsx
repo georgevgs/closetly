@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { intentColors } from "~/lib/designTokens";
+import { useMemo, useState } from "react";
 import { ActivityIndicator, ScrollView, TextInput, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { toast } from "sonner-native";
@@ -9,6 +10,7 @@ import { Pill } from "~/components/ui/Pill";
 import { DateField } from "~/components/ui/DateField";
 import { NumberField } from "~/features/trips/components/NumberField";
 import { EditTripBar } from "~/features/trips/components/EditTripBar";
+import { useBottomBarSpacing } from "~/components/ui/BottomBar";
 import { useTrip, type TripDetail } from "~/features/trips/hooks/useTrip";
 import { useUpdateTrip } from "~/features/trips/hooks/useTrips";
 import { parseDateOnly } from "~/lib/dates";
@@ -18,6 +20,7 @@ export default function EditTripScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: trip, isLoading } = useTrip(id);
   const updateTrip = useUpdateTrip();
+  const bottomBarSpacing = useBottomBarSpacing();
 
   const [name, setName] = useState("");
   const [destination, setDestination] = useState("");
@@ -27,10 +30,14 @@ export default function EditTripScreen() {
   const [tempMin, setTempMin] = useState("");
   const [tempMax, setTempMax] = useState("");
   const [seasons, setSeasons] = useState<Set<Season>>(new Set());
-  const [hydrated, setHydrated] = useState(false);
+  const [hydratedId, setHydratedId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!trip || hydrated) return;
+  // Hydrate form state from the loaded trip the first time it lands (and
+  // again if the user navigates to a different trip). Setting state during
+  // render — rather than in a useEffect — is React's preferred pattern when
+  // the new state is derived from a query result.
+  if (trip && hydratedId !== trip.id) {
+    setHydratedId(trip.id);
     hydrateFromTrip(trip, {
       setName,
       setDestination,
@@ -41,8 +48,7 @@ export default function EditTripScreen() {
       setTempMax,
       setSeasons,
     });
-    setHydrated(true);
-  }, [trip, hydrated]);
+  }
 
   const toggleSeason = (season: Season) => {
     const nextSeasons = new Set(seasons);
@@ -107,13 +113,19 @@ export default function EditTripScreen() {
 
   return (
     <Screen edges={["bottom"]}>
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 32, gap: 20 }}>
+      <ScrollView
+        contentContainerStyle={{
+          padding: 20,
+          paddingBottom: bottomBarSpacing,
+          gap: 20,
+        }}
+      >
         <Field label="Trip name">
           <TextInput
             value={name}
             onChangeText={setName}
             placeholder="e.g. Lisbon weekend"
-            placeholderTextColor="#a8a29e"
+            placeholderTextColor={intentColors.placeholder}
             className="h-12 px-4 rounded-lg border border-line dark:border-line-dark text-ink dark:text-ink-dark"
           />
         </Field>
@@ -123,7 +135,7 @@ export default function EditTripScreen() {
             value={destination}
             onChangeText={setDestination}
             placeholder="e.g. Lisbon, Portugal"
-            placeholderTextColor="#a8a29e"
+            placeholderTextColor={intentColors.placeholder}
             className="h-12 px-4 rounded-lg border border-line dark:border-line-dark text-ink dark:text-ink-dark"
           />
         </Field>
@@ -164,7 +176,7 @@ export default function EditTripScreen() {
             value={notes}
             onChangeText={setNotes}
             placeholder="Anything to remember while packing"
-            placeholderTextColor="#a8a29e"
+            placeholderTextColor={intentColors.placeholder}
             multiline
             numberOfLines={3}
             textAlignVertical="top"

@@ -1,8 +1,9 @@
 import { useMemo } from "react";
-import { Alert, View, Pressable } from "react-native";
+import { Alert, View } from "react-native";
 import { Image } from "expo-image";
-import { SymbolView } from "expo-symbols";
 import { Text } from "~/components/ui/Text";
+import { SwipeToDelete } from "~/components/ui/SwipeToDelete";
+import { radii } from "~/lib/designTokens";
 import { useSignedItems } from "~/features/closet/hooks/useSignedItems";
 import { useWearHistory, type WearEntry } from "~/features/wear/hooks/useWearHistory";
 import { useUndoWear } from "~/features/wear/hooks/useUndoWear";
@@ -63,24 +64,26 @@ function WearRow({
   const visibleItems = collectVisibleItems(wear.itemIds, itemsById);
 
   return (
-    <View className="flex-row items-center rounded-lg border border-line dark:border-line-dark p-2">
-      <View className="flex-row" style={{ gap: 4 }}>
-        {visibleItems.map((item) => (
-          <Thumbnail key={item.id} item={item} />
-        ))}
+    <SwipeToDelete onDelete={onRemove} accessibilityLabel="Remove wear">
+      <View
+        style={{ borderRadius: radii.row, padding: 8 }}
+        className="flex-row items-center border border-line dark:border-line-dark bg-canvas dark:bg-canvas-dark"
+      >
+        <View className="flex-row" style={{ gap: 4 }}>
+          {visibleItems.map((item) => (
+            <Thumbnail key={item.id} item={item} />
+          ))}
+        </View>
+        <View className="flex-1 ml-3">
+          <Text variant="body" numberOfLines={1}>
+            {formatWornOn(wear.wornOn)}
+          </Text>
+          <Text variant="caption" numberOfLines={1}>
+            {weatherSummary(wear)}
+          </Text>
+        </View>
       </View>
-      <View className="flex-1 ml-3">
-        <Text variant="body" numberOfLines={1}>
-          {formatWornOn(wear.wornOn)}
-        </Text>
-        <Text variant="caption" numberOfLines={1}>
-          {weatherSummary(wear)}
-        </Text>
-      </View>
-      <Pressable onPress={onRemove} hitSlop={12} className="px-2">
-        <SymbolView name="trash" size={20} tintColor="#a85a3b" />
-      </Pressable>
-    </View>
+    </SwipeToDelete>
   );
 }
 

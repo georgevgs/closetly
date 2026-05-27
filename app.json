@@ -22,20 +22,6 @@
         "tinted": "./assets/images/ios-icon-tinted.png"
       }
     },
-    "android": {
-      "package": "com.gvagdas.closetly",
-      "adaptiveIcon": {
-        "backgroundColor": "#faf8f5",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
-      },
-      "predictiveBackGestureEnabled": false,
-      "permissions": [
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
-      ]
-    },
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png"

@@ -1,9 +1,13 @@
 import { useState } from "react";
-import { Alert, ScrollView, View, Pressable } from "react-native";
+import { Alert, ScrollView, View, Pressable, RefreshControl } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useQueryClient } from "@tanstack/react-query";
 import { Screen } from "~/components/ui/Screen";
 import { Text } from "~/components/ui/Text";
 import { Button } from "~/components/ui/Button";
 import { Pill } from "~/components/ui/Pill";
+import { ScreenTitlePill } from "~/components/ui/ScreenTitlePill";
+import { spacing } from "~/lib/designTokens";
 import { useAuth } from "~/features/auth/context";
 import { supabase } from "~/lib/supabase";
 import { useThemePreference, type ThemePreference } from "~/providers/ThemeProvider";
@@ -44,6 +48,16 @@ export default function ProfileScreen() {
   const { isHidden, toggle, visible } = useCategoryPrefs();
   const preferredStyles = usePreferredStyles();
   const [signingOut, setSigningOut] = useState(false);
+  const [chromeHeight, setChromeHeight] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await queryClient.invalidateQueries();
+    setIsRefreshing(false);
+  };
 
   const handleStyleToggle = (style: Style) => {
     togglePreferredStyle(style);
@@ -73,11 +87,21 @@ export default function ProfileScreen() {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 24, flexGrow: 1 }}>
-        <View className="pt-6">
-          <Text variant="display">Profile</Text>
-        </View>
-        <View className="mt-12 gap-8">
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: spacing.screenX,
+          paddingTop: chromeHeight + spacing.innerGap,
+          paddingBottom: insets.bottom + 40,
+        }}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            progressViewOffset={chromeHeight}
+          />
+        }
+      >
+        <View className="gap-8">
           <View>
             <Text variant="label">Email</Text>
             <Text variant="body" className="mt-1">
@@ -153,8 +177,7 @@ export default function ProfileScreen() {
           <WearHistorySection userId={session?.user.id} />
 
           <LegalLinks />
-        </View>
-        <View className="mt-auto pt-12">
+
           <Button
             label="Sign out"
             variant="secondary"
@@ -163,6 +186,22 @@ export default function ProfileScreen() {
           />
         </View>
       </ScrollView>
+      <View
+        pointerEvents="box-none"
+        onLayout={(event) => setChromeHeight(event.nativeEvent.layout.height)}
+        style={{ position: "absolute", top: 0, left: 0, right: 0 }}
+      >
+        <View
+          className="flex-row items-center"
+          style={{
+            paddingHorizontal: spacing.screenX,
+            paddingTop: spacing.screenY,
+            paddingBottom: spacing.innerGap,
+          }}
+        >
+          <ScreenTitlePill label="Profile" />
+        </View>
+      </View>
     </Screen>
   );
 }

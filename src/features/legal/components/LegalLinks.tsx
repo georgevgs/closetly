@@ -3,6 +3,8 @@ import { useRouter } from "expo-router";
 import { SymbolView } from "expo-symbols";
 
 import { Text } from "~/components/ui/Text";
+import { Card } from "~/components/ui/Card";
+import { intentColors } from "~/lib/designTokens";
 
 export function LegalLinks() {
   const router = useRouter();
@@ -13,11 +15,11 @@ export function LegalLinks() {
   return (
     <View>
       <Text variant="label">Legal</Text>
-      <View className="mt-2 rounded-lg border border-line dark:border-line-dark overflow-hidden">
+      <Card padding="none" className="mt-2 overflow-hidden">
         <LegalRow label="Privacy Policy" onPress={openPrivacy} />
         <Divider />
         <LegalRow label="Terms of Service" onPress={openTerms} />
-      </View>
+      </Card>
     </View>
   );
 }
@@ -29,7 +31,7 @@ function LegalRow({ label, onPress }: { label: string; onPress: () => void }) {
       className="flex-row items-center justify-between px-4 h-12 active:opacity-60"
     >
       <Text variant="body">{label}</Text>
-      <SymbolView name="chevron.right" size={14} tintColor="#a8a29e" />
+      <SymbolView name="chevron.right" size={14} tintColor={intentColors.placeholder} />
     </Pressable>
   );
 }

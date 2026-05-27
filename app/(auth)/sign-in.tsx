@@ -1,3 +1,4 @@
+import { intentColors } from "~/lib/designTokens";
 import { useState } from "react";
 import { View, TextInput } from "react-native";
 import { toast } from "sonner-native";
@@ -115,7 +116,7 @@ function EmailStep({
         <TextInput
           className="h-12 px-4 rounded-lg border border-line dark:border-line-dark text-ink dark:text-ink-dark bg-canvas dark:bg-canvas-dark"
           placeholder="you@example.com"
-          placeholderTextColor="#a8a29e"
+          placeholderTextColor={intentColors.placeholder}
           autoCapitalize="none"
           autoCorrect={false}
           inputMode="email"
