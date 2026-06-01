@@ -44,6 +44,7 @@ const buildItem = (category: Category, idOverride?: string): Item => {
 
 const buildSuggestion = (items: Item[], totalScore: number): OutfitSuggestion => {
   const breakdown: ScoreBreakdown = {
+    rawTotal: totalScore,
     total: totalScore,
     color: totalScore,
     proportion: null,

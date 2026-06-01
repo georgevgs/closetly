@@ -246,7 +246,7 @@ function ScorePlaceholder({ itemCount }: { itemCount: number }) {
 function ScoreChips({ score }: { score: ScoreBreakdown }) {
   return (
     <View className="mt-3 flex-row flex-wrap gap-1.5">
-      <ScoreChip label="Color" value={score.color} />
+      {score.color !== null && <ScoreChip label="Color" value={score.color} />}
       {score.proportion !== null && <ScoreChip label="Palette" value={score.proportion} />}
       <ScoreChip label="Style" value={score.style} />
       <ScoreChip label="Formality" value={score.formality} />

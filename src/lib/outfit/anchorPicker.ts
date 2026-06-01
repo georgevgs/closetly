@@ -1,5 +1,5 @@
 import type { Item, Category, Occasion } from "../../types/items";
-import { recencyPenaltyForDaysAgo } from "../../features/outfits/tuning";
+import { RECENCY, recencyPenaltyForDaysAgo } from "../../features/outfits/tuning";
 import type { WeatherContext } from "./score";
 
 // A "today" outfit is best anchored on the piece that defines the silhouette.
@@ -72,6 +72,13 @@ const anchorScore = (
 // Implicit-signal recommender literature treats "novelty" as a first-class
 // objective alongside relevance — without it the algorithm keeps surfacing
 // the same five anchors and the closet feels smaller than it is.
+//
+// The bonus is graded by how long ago the item was last worn so the curve is
+// continuous: an item worn today gets 0, an item worn a full window ago gets
+// the full bonus, and an item not in the wear log (never worn, or worn
+// outside the window) gets the full bonus too. The previous binary version
+// produced a +4 jump at the window edge purely because the item fell off the
+// recency map.
 const REDISCOVERY_BONUS = 4;
 
 const rediscoveryBonus = (
@@ -80,8 +87,10 @@ const rediscoveryBonus = (
 ): number => {
   if (!recentlyWornItemIds) return 0;
   if (recentlyWornItemIds.size === 0) return 0;
-  if (recentlyWornItemIds.has(item.id)) return 0;
-  return REDISCOVERY_BONUS;
+  const daysAgo = recentlyWornItemIds.get(item.id);
+  if (daysAgo === undefined) return REDISCOVERY_BONUS;
+  const ramp = Math.min(1, Math.max(0, daysAgo / RECENCY.windowDays));
+  return REDISCOVERY_BONUS * ramp;
 };
 
 const seasonBonus = (item: Item, weather: WeatherContext | undefined): number => {

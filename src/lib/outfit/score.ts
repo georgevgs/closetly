@@ -11,8 +11,16 @@ import {
 } from "../../features/outfits/tuning";
 
 export type ScoreBreakdown = {
+  // Unclamped score used for sort and diversity reranking. Outfits with strong
+  // wear history can exceed 100 once bonuses stack; preserving the raw value
+  // keeps ordering stable within the saturated top tier.
+  rawTotal: number;
+  // Clamped 0-100 score for display. Always equals clamp(rawTotal).
   total: number;
-  color: number;
+  // null = no colored pairs available (e.g. no colors extracted yet). The
+  // component is dropped from the weighted average instead of contributing a
+  // misleading neutral score.
+  color: number | null;
   // 60-30-10 distribution at item level — separate from raw color harmony.
   // null = not enough colored items to assess proportion.
   proportion: number | null;
@@ -79,15 +87,17 @@ export function scoreOutfit(items: Item[], opts: ScoreOptions = {}): ScoreBreakd
     { value: balanceScore, weight: W_BALANCE },
   ];
 
-  let total = weightedAverage(components);
-  total += affinityBonus(items, opts.pairAffinity, notes);
-  total += stylePreferenceBonus(items, opts.preferredStyles, notes);
-  total += coreWardrobeBonus(items, opts.itemWearCounts, notes);
-  total -= computeRecencyPenalty(items, opts.recentlyWornItemIds, notes);
+  let rawTotal = weightedAverage(components);
+  rawTotal += affinityBonus(items, opts.pairAffinity, notes);
+  rawTotal += stylePreferenceBonus(items, opts.preferredStyles, notes);
+  rawTotal += coreWardrobeBonus(items, opts.itemWearCounts, notes);
+  rawTotal -= computeRecencyPenalty(items, opts.recentlyWornItemIds, notes);
 
+  const roundedRaw = Math.round(rawTotal);
   return {
-    total: clampPercentage(Math.round(total)),
-    color: Math.round(colorScore),
+    rawTotal: roundedRaw,
+    total: clampPercentage(roundedRaw),
+    color: roundOrNull(colorScore),
     proportion: roundOrNull(proportionScore),
     formality: Math.round(formalityScore),
     style: Math.round(styleScore),
@@ -121,6 +131,11 @@ const computeWeatherScore = (
   return scoreWeather(items, weather, notes);
 };
 
+// Treat unknown pairs as 0 affinity rather than excluding them from the
+// average. An outfit where six of six pairs are mildly liked is stronger
+// evidence than one where one of six pairs is strongly liked; dividing by
+// the total pair count instead of the known-pair count makes the bonus
+// reflect coverage as well as magnitude.
 const affinityBonus = (
   items: Item[],
   pairAffinity: Map<string, number> | undefined,
@@ -130,7 +145,8 @@ const affinityBonus = (
   if (pairAffinity.size === 0) return 0;
   if (items.length < 2) return 0;
 
-  let totalAffinity = 0;
+  const totalPairs = (items.length * (items.length - 1)) / 2;
+  let sumAffinity = 0;
   let knownPairs = 0;
   items.forEach((firstItem, firstIndex) => {
     const remaining = items.slice(firstIndex + 1);
@@ -138,15 +154,15 @@ const affinityBonus = (
       const key = pairKey(firstItem.id, secondItem.id);
       const affinity = pairAffinity.get(key);
       if (affinity === undefined) continue;
-      totalAffinity += affinity;
+      sumAffinity += affinity;
       knownPairs++;
     }
   });
 
   if (knownPairs === 0) return 0;
-  const average = totalAffinity / knownPairs;
-  if (average > 0.3) notes.push("Boosted by your favorites");
-  return average * 5;
+  const meanOverAllPairs = sumAffinity / totalPairs;
+  if (meanOverAllPairs > 0.2) notes.push("Boosted by your favorites");
+  return meanOverAllPairs * 5;
 };
 
 // Bias toward outfits whose items match the vibes the user picked at
@@ -224,8 +240,9 @@ const recencyNoteFor = (penalty: number): string => {
 
 const zeroBreakdown = (): ScoreBreakdown => {
   return {
+    rawTotal: 0,
     total: 0,
-    color: 0,
+    color: null,
     proportion: null,
     formality: 0,
     style: 0,
@@ -247,12 +264,16 @@ const clampPercentage = (value: number): number => {
   return value;
 };
 
-function scoreColor(items: Item[], notes: string[]): number {
+// Returns null when there isn't enough color data to assess harmony — i.e.
+// fewer than two extracted colors across the outfit, or no cross-item pairs.
+// The weighted average drops the component in that case rather than averaging
+// in a misleading neutral score.
+function scoreColor(items: Item[], notes: string[]): number | null {
   const colorsByItem: HSL[][] = items.map((item) =>
     item.colors.slice(0, 2).map((color) => color.hsl),
   );
   const flatColors = colorsByItem.flat();
-  if (flatColors.length < 2) return 60;
+  if (flatColors.length < 2) return null;
 
   const crossItemPairs: PairScore[] = [];
   for (let firstIndex = 0; firstIndex < colorsByItem.length; firstIndex++) {
@@ -264,7 +285,7 @@ function scoreColor(items: Item[], notes: string[]): number {
       }
     }
   }
-  if (crossItemPairs.length === 0) return 60;
+  if (crossItemPairs.length === 0) return null;
 
   const result = paletteHarmony(flatColors, crossItemPairs);
   notes.push(...result.notes);

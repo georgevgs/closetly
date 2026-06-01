@@ -21,6 +21,12 @@ export type CombinatorOptions = {
 
 const MIN_TOTAL_SCORE = 50;
 const PREFILTER_KEEP = 8;
+// Safety ceiling on the combinatorial expansion. With four slots and
+// PREFILTER_KEEP = 8 we cap at 4096 today, but future extra slots (capsule
+// pieces, accessories) would blow up multiplicatively. The cap is generous
+// enough that real closets never hit it; it exists to keep the search
+// bounded in pathological cases.
+const MAX_COMBOS = 6000;
 
 export function suggestOutfits(opts: CombinatorOptions): OutfitSuggestion[] {
   const {
@@ -48,7 +54,7 @@ export function suggestOutfits(opts: CombinatorOptions): OutfitSuggestion[] {
   const trimmed = trimCandidates(slots, candidates, anchor, weather);
 
   const combos: Item[][] = [];
-  buildCombos(trimmed, 0, [], combos);
+  buildCombos(trimmed, 0, [], combos, MAX_COMBOS);
 
   const scored = combos.map((items) => ({
     items,
@@ -63,7 +69,7 @@ export function suggestOutfits(opts: CombinatorOptions): OutfitSuggestion[] {
 
   return scored
     .filter((suggestion) => suggestion.score.total >= MIN_TOTAL_SCORE)
-    .sort((first, second) => second.score.total - first.score.total)
+    .sort((first, second) => second.score.rawTotal - first.score.rawTotal)
     .slice(0, limit);
 }
 
@@ -223,19 +229,22 @@ function buildCombos(
   bucketIndex: number,
   chosen: Item[],
   output: Item[][],
+  maxCombos: number,
 ) {
+  if (output.length >= maxCombos) return;
   if (bucketIndex === buckets.length) {
     output.push([...chosen]);
     return;
   }
   const bucket = buckets[bucketIndex];
   if (bucket.length === 0) {
-    buildCombos(buckets, bucketIndex + 1, chosen, output);
+    buildCombos(buckets, bucketIndex + 1, chosen, output, maxCombos);
     return;
   }
   for (const item of bucket) {
+    if (output.length >= maxCombos) return;
     chosen.push(item);
-    buildCombos(buckets, bucketIndex + 1, chosen, output);
+    buildCombos(buckets, bucketIndex + 1, chosen, output, maxCombos);
     chosen.pop();
   }
 }

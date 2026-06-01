@@ -73,7 +73,9 @@ export function OutfitCard({
       </View>
 
       <View className="mt-3 flex-row flex-wrap gap-1.5">
-        <ScoreChip label="Color" value={outfit.score.color} />
+        {outfit.score.color !== null && (
+          <ScoreChip label="Color" value={outfit.score.color} />
+        )}
         {outfit.score.proportion !== null && (
           <ScoreChip label="Palette" value={outfit.score.proportion} />
         )}

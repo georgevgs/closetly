@@ -36,7 +36,7 @@ const jitterScores = (
 ): JitteredCandidate[] => {
   return candidates.map((suggestion) => {
     const offset = jitterOffsetFor(random);
-    return { suggestion, jitteredScore: suggestion.score.total + offset };
+    return { suggestion, jitteredScore: suggestion.score.rawTotal + offset };
   });
 };
 

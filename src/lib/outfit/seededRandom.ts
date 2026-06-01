@@ -14,9 +14,13 @@ export const createSeededRandom = (seed: number): (() => number) => {
   };
 };
 
+// Encode the calendar date as YYYYMMDD so the invariant is obvious at a
+// glance and doesn't depend on whether the source `Date` API is 0- or
+// 1-indexed. Two distinct calendar dates always produce two distinct seeds;
+// a single date always produces the same seed.
 export const dailySeed = (now: Date = new Date()): number => {
   const year = now.getFullYear();
-  const month = now.getMonth();
+  const month = now.getMonth() + 1;
   const day = now.getDate();
-  return (year * 372 + month * 31 + day) >>> 0;
+  return (year * 10000 + month * 100 + day) >>> 0;
 };

@@ -14,6 +14,9 @@ export type TodayOutfitOptions = {
   itemWearCounts?: Map<string, number>;
   targetOccasion?: Occasion;
   count?: number;
+  // Injectable for tests — production callers should leave this undefined so
+  // the seed comes from the actual current date.
+  now?: Date;
 };
 
 // Oversample then re-rank: pull more anchors and more outfits per anchor than
@@ -32,6 +35,7 @@ export const suggestTodayOutfits = (opts: TodayOutfitOptions): OutfitSuggestion[
     itemWearCounts,
     targetOccasion,
     count = 3,
+    now,
   } = opts;
 
   const anchors = pickAnchorsForToday({
@@ -60,7 +64,7 @@ export const suggestTodayOutfits = (opts: TodayOutfitOptions): OutfitSuggestion[
   }
 
   const deduped = dedupeBySignature(pool);
-  const random = createSeededRandom(dailySeed());
+  const random = createSeededRandom(dailySeed(now));
   return pickDiverseOutfits({ candidates: deduped, count, random });
 };
 
