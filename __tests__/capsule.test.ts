@@ -54,6 +54,7 @@ const buildItem = (overrides: ItemOverrides = {}): Item => {
     currency: null,
     purchasedOn: null,
     timesWashed: 0,
+    inWash: false,
     created_at: "2026-05-10T00:00:00Z",
   };
 };

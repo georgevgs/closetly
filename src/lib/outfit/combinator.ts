@@ -36,7 +36,8 @@ export function suggestOutfits(opts: CombinatorOptions): OutfitSuggestion[] {
     includeOuterwear,
   } = opts;
 
-  const filteredCloset = filterClosetByOccasion(closet, anchor, targetOccasion);
+  const availableCloset = filterAvailable(closet, anchor);
+  const filteredCloset = filterClosetByOccasion(availableCloset, anchor, targetOccasion);
   const withOuterwear = resolveIncludeOuterwear(includeOuterwear, weather);
   const slots = pickSlots(anchor, withOuterwear);
   const buckets = bucketByCategory(filteredCloset, anchor);
@@ -102,6 +103,16 @@ const trimCandidates = (
   return candidates.map((slotCandidates, slotIndex) => {
     if (slots[slotIndex] === anchor.category) return slotCandidates;
     return prefilter(slotCandidates, anchor, weather).slice(0, PREFILTER_KEEP);
+  });
+};
+
+// Pieces flagged as in the wash are unavailable — the user can't actually
+// wear them today. The anchor is exempt because the user picked it
+// explicitly (e.g. tapping "find outfits with this" from item detail).
+const filterAvailable = (closet: Item[], anchor: Item): Item[] => {
+  return closet.filter((item) => {
+    if (item.id === anchor.id) return true;
+    return !item.inWash;
   });
 };
 

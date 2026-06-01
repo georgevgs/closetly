@@ -14,6 +14,7 @@ import { GlassSurface } from "~/components/ui/GlassSurface";
 import { useItem, useDeleteItem } from "~/features/closet/hooks/useItems";
 import { ItemDetailSkeleton } from "~/features/closet/components/ItemDetailSkeleton";
 import { useMarkWashed } from "~/features/closet/hooks/useMarkWashed";
+import { useToggleInWash } from "~/features/closet/hooks/useToggleInWash";
 import { signFirst } from "~/features/closet/itemPicker";
 import { useQuery } from "@tanstack/react-query";
 import { foregroundFor } from "~/lib/utils";
@@ -24,6 +25,7 @@ export default function ItemDetail() {
   const { data: item, isLoading } = useItem(id);
   const del = useDeleteItem();
   const markWashed = useMarkWashed();
+  const toggleInWash = useToggleInWash();
   const { colorScheme } = useColorScheme();
   const foreground = foregroundFor(colorScheme);
 
@@ -121,11 +123,20 @@ export default function ItemDetail() {
         <CareSection
           item={display}
           marking={markWashed.isPending}
+          togglingInWash={toggleInWash.isPending}
           onMarkWashed={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             markWashed.mutate(display.id, {
               onSuccess: () => toast.success("Wash logged"),
             });
+          }}
+          onToggleInWash={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            const nextInWash = !display.inWash;
+            toggleInWash.mutate(
+              { itemId: display.id, inWash: nextInWash },
+              { onSuccess: () => toast.success(washStatusToastFor(nextInWash)) },
+            );
           }}
         />
 
@@ -185,11 +196,15 @@ function PriceSection({ item }: { item: Item }) {
 function CareSection({
   item,
   marking,
+  togglingInWash,
   onMarkWashed,
+  onToggleInWash,
 }: {
   item: Item;
   marking: boolean;
+  togglingInWash: boolean;
   onMarkWashed: () => void;
+  onToggleInWash: () => void;
 }) {
   return (
     <View>
@@ -203,6 +218,15 @@ function CareSection({
           variant="secondary"
           onPress={onMarkWashed}
           disabled={marking}
+        />
+      </View>
+      <View className="flex-row items-center justify-between mt-3">
+        <Text variant="body">{wearAvailabilityLabel(item.inWash)}</Text>
+        <Button
+          label={inWashToggleLabel(item.inWash, togglingInWash)}
+          variant="secondary"
+          onPress={onToggleInWash}
+          disabled={togglingInWash}
         />
       </View>
     </View>
@@ -283,4 +307,20 @@ const washCountLabel = (count: number): string => {
 const markWashedLabel = (marking: boolean): string => {
   if (marking) return "Logging…";
   return "Mark washed";
+};
+
+const wearAvailabilityLabel = (inWash: boolean): string => {
+  if (inWash) return "In the wash — hidden from suggestions";
+  return "Available for outfits";
+};
+
+const inWashToggleLabel = (inWash: boolean, pending: boolean): string => {
+  if (pending) return "Updating…";
+  if (inWash) return "Back in rotation";
+  return "Send to wash";
+};
+
+const washStatusToastFor = (inWash: boolean): string => {
+  if (inWash) return "Sent to wash";
+  return "Back in rotation";
 };

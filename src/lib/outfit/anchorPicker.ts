@@ -18,7 +18,8 @@ export type AnchorPickerOptions = {
 export const pickAnchorsForToday = (opts: AnchorPickerOptions): Item[] => {
   const { closet, weather, recentlyWornItemIds, targetOccasion, count = 3 } = opts;
 
-  const occasionFiltered = filterByOccasion(closet, targetOccasion);
+  const available = filterAvailable(closet);
+  const occasionFiltered = filterByOccasion(available, targetOccasion);
   const candidates = filterAnchorCandidates(occasionFiltered);
   if (candidates.length === 0) return [];
 
@@ -30,6 +31,12 @@ export const pickAnchorsForToday = (opts: AnchorPickerOptions): Item[] => {
     .sort((first, second) => second.score - first.score);
 
   return ranked.slice(0, count).map((entry) => entry.item);
+};
+
+// Items the user has flagged as in the laundry shouldn't be offered as
+// anchors — same intent as filtering archived rows out at the data layer.
+const filterAvailable = (closet: Item[]): Item[] => {
+  return closet.filter((item) => !item.inWash);
 };
 
 const filterByOccasion = (

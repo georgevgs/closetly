@@ -34,6 +34,7 @@ export type Database = {
           currency: string | null
           formality: number
           id: string
+          in_wash: boolean
           name: string | null
           notes: string | null
           occasions: Database["public"]["Enums"]["occasion_tag"][]
@@ -59,6 +60,7 @@ export type Database = {
           currency?: string | null
           formality?: number
           id?: string
+          in_wash?: boolean
           name?: string | null
           notes?: string | null
           occasions?: Database["public"]["Enums"]["occasion_tag"][]

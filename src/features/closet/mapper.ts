@@ -28,6 +28,7 @@ export function itemFromRow(row: ItemRow): Item {
     currency: row.currency,
     purchasedOn: row.purchased_on,
     timesWashed: row.times_washed,
+    inWash: row.in_wash,
     created_at: row.created_at,
   };
 }

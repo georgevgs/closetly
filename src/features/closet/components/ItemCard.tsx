@@ -1,5 +1,6 @@
 import { View } from "react-native";
 import { Image, type ImageProps } from "expo-image";
+import { SymbolView } from "expo-symbols";
 import { Text } from "~/components/ui/Text";
 import { PressableScale } from "~/components/ui/PressableScale";
 import type { Item, Category } from "~/types/items";
@@ -21,16 +22,19 @@ type ImagePriority = NonNullable<ImageProps["priority"]>;
 type Props = {
   item: Item;
   onPress?: () => void;
+  onLongPress?: () => void;
   selected?: boolean;
   size?: "sm" | "md" | "lg";
   priority?: ImagePriority;
 };
 
 const aspect = { sm: 1, md: 1, lg: 1 };
+const IN_WASH_IMAGE_OPACITY = 0.45;
 
 export function ItemCard({
   item,
   onPress,
+  onLongPress,
   selected,
   size = "md",
   priority = "normal",
@@ -43,6 +47,7 @@ export function ItemCard({
   return (
     <PressableScale
       onPress={onPress}
+      onLongPress={onLongPress}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       className={cn(
@@ -54,12 +59,13 @@ export function ItemCard({
       <Image
         source={{ uri: previewUri }}
         recyclingKey={previewUri}
-        style={{ flex: 1 }}
+        style={{ flex: 1, opacity: imageOpacityFor(item) }}
         contentFit="cover"
         transition={150}
         cachePolicy="memory-disk"
         priority={priority}
       />
+      {item.inWash && <InWashBadge />}
       {showLabel && (
         <View className="absolute bottom-0 left-0 right-0 px-2 py-1.5 bg-canvas/85 dark:bg-canvas-dark/85 flex-row items-center gap-2">
           {item.colors[0] && (
@@ -76,6 +82,20 @@ export function ItemCard({
     </PressableScale>
   );
 }
+
+function InWashBadge() {
+  return (
+    <View className="absolute top-2 left-2 flex-row items-center gap-1 px-2 py-1 rounded-full bg-canvas/90 dark:bg-canvas-dark/90 border border-line dark:border-line-dark">
+      <SymbolView name="bubbles.and.sparkles.fill" size={11} tintColor="#3478F6" />
+      <Text variant="caption">In wash</Text>
+    </View>
+  );
+}
+
+const imageOpacityFor = (item: Item): number => {
+  if (item.inWash) return IN_WASH_IMAGE_OPACITY;
+  return 1;
+};
 
 const cardBorderClass = (selected: boolean | undefined): string => {
   if (selected) return "border-ink dark:border-ink-dark";

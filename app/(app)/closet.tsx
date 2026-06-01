@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { ActionSheetIOS, RefreshControl, View, ScrollView } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -7,6 +7,7 @@ import { FlashList } from "@shopify/flash-list";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import * as Haptics from "expo-haptics";
+import { toast } from "sonner-native";
 import type { BottomSheetModal } from "@gorhom/bottom-sheet";
 
 import { Screen } from "~/components/ui/Screen";
@@ -23,6 +24,7 @@ import { SearchField } from "~/features/closet/components/SearchField";
 import { ClosetEmptyState } from "~/features/closet/components/ClosetEmptyState";
 import { ClosetGridSkeleton } from "~/features/closet/components/ClosetGridSkeleton";
 import { useSignedItems } from "~/features/closet/hooks/useSignedItems";
+import { useToggleInWash } from "~/features/closet/hooks/useToggleInWash";
 import { useAuth } from "~/features/auth/context";
 import { useCategoryPrefs } from "~/providers/CategoryPrefsProvider";
 import { useDebouncedValue } from "~/hooks/useDebouncedValue";
@@ -62,6 +64,7 @@ const SEARCH_DEBOUNCE_MS = 150;
 export default function ClosetScreen() {
   const { session } = useAuth();
   const { data: items, isLoading } = useSignedItems(session?.user.id);
+  const toggleInWash = useToggleInWash();
   const { visible: visibleCategories } = useCategoryPrefs();
   const [filter, setFilter] = useState<Category | "all">("all");
   const [sort, setSort] = useState<SortMode>("newest");
@@ -149,6 +152,18 @@ export default function ClosetScreen() {
     setFilter("all");
   };
 
+  const handleLongPressItem = useCallback(
+    (item: Item) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      const nextInWash = !item.inWash;
+      toggleInWash.mutate(
+        { itemId: item.id, inWash: nextInWash },
+        { onSuccess: () => toast.success(washToastFor(nextInWash)) },
+      );
+    },
+    [toggleInWash],
+  );
+
   return (
     <Screen>
       <ClosetBody
@@ -168,6 +183,7 @@ export default function ClosetScreen() {
           />
         }
         onClearEverything={clearEverything}
+        onLongPressItem={handleLongPressItem}
       />
       <View
         pointerEvents="box-none"
@@ -393,6 +409,7 @@ function ClosetBody({
   onRefresh,
   listHeader,
   onClearEverything,
+  onLongPressItem,
 }: {
   isLoading: boolean;
   items: Item[];
@@ -404,6 +421,7 @@ function ClosetBody({
   onRefresh: () => void;
   listHeader: React.ReactNode;
   onClearEverything: () => void;
+  onLongPressItem: (item: Item) => void;
 }) {
   if (isLoading) {
     return <ClosetGridSkeleton topPadding={chromeHeight + spacing.innerGap} />;
@@ -431,6 +449,7 @@ function ClosetBody({
         listHeader={listHeader}
         isRefreshing={isRefreshing}
         onRefresh={onRefresh}
+        onLongPressItem={onLongPressItem}
       />
     </Animated.View>
   );
@@ -443,6 +462,7 @@ function ItemGrid({
   listHeader,
   isRefreshing,
   onRefresh,
+  onLongPressItem,
 }: {
   items: Item[];
   chromeHeight: number;
@@ -450,6 +470,7 @@ function ItemGrid({
   listHeader: React.ReactNode;
   isRefreshing: boolean;
   onRefresh: () => void;
+  onLongPressItem: (item: Item) => void;
 }) {
   return (
     <View style={{ flex: 1 }}>
@@ -476,6 +497,7 @@ function ItemGrid({
               item={item}
               priority={loadPriorityFor(index)}
               onPress={() => router.push(`/items/${item.id}`)}
+              onLongPress={() => onLongPressItem(item)}
             />
           </View>
         )}
@@ -527,6 +549,11 @@ const sortItems = (items: Item[], sort: SortMode): Item[] => {
 const filterButtonLabel = (activeCount: number): string => {
   if (activeCount === 0) return "Filters";
   return `Filters · ${activeCount}`;
+};
+
+const washToastFor = (inWash: boolean): string => {
+  if (inWash) return "In the wash — hidden from suggestions";
+  return "Back in rotation";
 };
 
 const isFiltering = ({

@@ -1,6 +1,8 @@
 import type { Item, Occasion, Style } from "../../types/items";
 import { suggestOutfits, type OutfitSuggestion } from "./combinator";
 import { pickAnchorsForToday } from "./anchorPicker";
+import { pickDiverseOutfits } from "./diversity";
+import { createSeededRandom, dailySeed } from "./seededRandom";
 import type { WeatherContext } from "./score";
 
 export type TodayOutfitOptions = {
@@ -13,6 +15,12 @@ export type TodayOutfitOptions = {
   targetOccasion?: Occasion;
   count?: number;
 };
+
+// Oversample then re-rank: pull more anchors and more outfits per anchor than
+// we'll display so the diversity picker has variety to avoid "same top with
+// three different shoes." Standard recommender-system pattern.
+const ANCHOR_POOL_MULTIPLIER = 2;
+const PER_ANCHOR_LIMIT = 4;
 
 export const suggestTodayOutfits = (opts: TodayOutfitOptions): OutfitSuggestion[] => {
   const {
@@ -31,11 +39,11 @@ export const suggestTodayOutfits = (opts: TodayOutfitOptions): OutfitSuggestion[
     weather,
     recentlyWornItemIds,
     targetOccasion,
-    count,
+    count: count * ANCHOR_POOL_MULTIPLIER,
   });
   if (anchors.length === 0) return [];
 
-  const all: OutfitSuggestion[] = [];
+  const pool: OutfitSuggestion[] = [];
   for (const anchor of anchors) {
     const fromAnchor = suggestOutfits({
       anchor,
@@ -46,14 +54,14 @@ export const suggestTodayOutfits = (opts: TodayOutfitOptions): OutfitSuggestion[
       preferredStyles,
       itemWearCounts,
       targetOccasion,
-      limit: 3,
+      limit: PER_ANCHOR_LIMIT,
     });
-    all.push(...fromAnchor);
+    pool.push(...fromAnchor);
   }
 
-  return dedupeBySignature(all)
-    .sort((first, second) => second.score.total - first.score.total)
-    .slice(0, count);
+  const deduped = dedupeBySignature(pool);
+  const random = createSeededRandom(dailySeed());
+  return pickDiverseOutfits({ candidates: deduped, count, random });
 };
 
 const dedupeBySignature = (suggestions: OutfitSuggestion[]): OutfitSuggestion[] => {
