@@ -154,7 +154,7 @@ export default function ClosetScreen() {
 
   const handleLongPressItem = useCallback(
     (item: Item) => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      Haptics.selectionAsync();
       const nextInWash = !item.inWash;
       toggleInWash.mutate(
         { itemId: item.id, inWash: nextInWash },

@@ -1,6 +1,15 @@
 import { View } from "react-native";
 import { Image, type ImageProps } from "expo-image";
 import { SymbolView } from "expo-symbols";
+import Animated, {
+  FadeIn,
+  FadeOut,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+  Easing,
+} from "react-native-reanimated";
+import { useEffect } from "react";
 import { Text } from "~/components/ui/Text";
 import { PressableScale } from "~/components/ui/PressableScale";
 import type { Item, Category } from "~/types/items";
@@ -30,6 +39,7 @@ type Props = {
 
 const aspect = { sm: 1, md: 1, lg: 1 };
 const IN_WASH_IMAGE_OPACITY = 0.45;
+const OPACITY_TRANSITION_MS = 220;
 
 export function ItemCard({
   item,
@@ -56,15 +66,7 @@ export function ItemCard({
       )}
       style={{ aspectRatio: aspect[size] }}
     >
-      <Image
-        source={{ uri: previewUri }}
-        recyclingKey={previewUri}
-        style={{ flex: 1, opacity: imageOpacityFor(item) }}
-        contentFit="cover"
-        transition={150}
-        cachePolicy="memory-disk"
-        priority={priority}
-      />
+      <ItemImage uri={previewUri} priority={priority} inWash={item.inWash} />
       {item.inWash && <InWashBadge />}
       {showLabel && (
         <View className="absolute bottom-0 left-0 right-0 px-2 py-1.5 bg-canvas/85 dark:bg-canvas-dark/85 flex-row items-center gap-2">
@@ -83,17 +85,59 @@ export function ItemCard({
   );
 }
 
-function InWashBadge() {
+function ItemImage({
+  uri,
+  priority,
+  inWash,
+}: {
+  uri: string;
+  priority: ImagePriority;
+  inWash: boolean;
+}) {
+  const targetOpacity = imageOpacityFor(inWash);
+  const opacityValue = useSharedValue(targetOpacity);
+
+  useEffect(() => {
+    opacityValue.value = withTiming(targetOpacity, {
+      duration: OPACITY_TRANSITION_MS,
+      easing: Easing.out(Easing.quad),
+    });
+  }, [targetOpacity, opacityValue]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacityValue.value,
+  }));
+
   return (
-    <View className="absolute top-2 left-2 flex-row items-center gap-1 px-2 py-1 rounded-full bg-canvas/90 dark:bg-canvas-dark/90 border border-line dark:border-line-dark">
-      <SymbolView name="bubbles.and.sparkles.fill" size={11} tintColor="#3478F6" />
-      <Text variant="caption">In wash</Text>
-    </View>
+    <Animated.View style={[{ flex: 1 }, animatedStyle]}>
+      <Image
+        source={{ uri }}
+        recyclingKey={uri}
+        style={{ flex: 1 }}
+        contentFit="cover"
+        transition={150}
+        cachePolicy="memory-disk"
+        priority={priority}
+      />
+    </Animated.View>
   );
 }
 
-const imageOpacityFor = (item: Item): number => {
-  if (item.inWash) return IN_WASH_IMAGE_OPACITY;
+function InWashBadge() {
+  return (
+    <Animated.View
+      entering={FadeIn.duration(180)}
+      exiting={FadeOut.duration(140)}
+      className="absolute top-2 left-2 flex-row items-center gap-1 px-2 py-1 rounded-full bg-canvas/90 dark:bg-canvas-dark/90 border border-line dark:border-line-dark"
+    >
+      <SymbolView name="bubbles.and.sparkles.fill" size={11} tintColor="#3478F6" />
+      <Text variant="caption">In wash</Text>
+    </Animated.View>
+  );
+}
+
+const imageOpacityFor = (inWash: boolean): number => {
+  if (inWash) return IN_WASH_IMAGE_OPACITY;
   return 1;
 };
 

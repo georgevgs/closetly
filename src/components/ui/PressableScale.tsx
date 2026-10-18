@@ -44,10 +44,12 @@ export function PressableScale({
   const handlePressIn = useCallback(
     (event: GestureResponderEvent) => {
       if (disabled) return;
-      scaleValue.value = withTiming(pressedScale, {
-        duration: PRESS_IN_DURATION_MS,
-        easing: Easing.out(Easing.quad),
-      });
+      scaleValue.set(
+        withTiming(pressedScale, {
+          duration: PRESS_IN_DURATION_MS,
+          easing: Easing.out(Easing.quad),
+        }),
+      );
       onPressIn?.(event);
     },
     [scaleValue, pressedScale, disabled, onPressIn],
@@ -55,7 +57,7 @@ export function PressableScale({
 
   const handlePressOut = useCallback(
     (event: GestureResponderEvent) => {
-      scaleValue.value = withSpring(1, RELEASE_SPRING);
+      scaleValue.set(withSpring(1, RELEASE_SPRING));
       onPressOut?.(event);
     },
     [scaleValue, onPressOut],
