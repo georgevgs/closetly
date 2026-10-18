@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
-import { InteractionManager } from "react-native";
 
 import type { OutfitSuggestion } from "~/lib/outfit/combinator";
 
-// Scoring runs hundreds of combinations per anchor. We defer it to after the
-// current interaction so navigation/scroll stays at 60fps; the `cancelled`
+// Scoring runs hundreds of combinations per anchor. We defer it to an idle
+// frame so navigation/scroll stays at 60fps; the `cancelled`
 // guard prevents stale results from landing if dependencies change mid-compute.
 //
 // `isComputing` is derived from comparing the last-computed deps against the
@@ -21,14 +20,14 @@ export const useDeferredSuggestions = <Inputs,>(
 
   useEffect(() => {
     let cancelled = false;
-    const handle = InteractionManager.runAfterInteractions(() => {
+    const idleCallbackId = requestIdleCallback(() => {
       if (cancelled) return;
       const computed = compute(inputs);
       setResult({ suggestions: computed, deps: dependencies });
     });
     return () => {
       cancelled = true;
-      handle.cancel();
+      cancelIdleCallback(idleCallbackId);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, dependencies);

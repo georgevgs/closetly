@@ -13,6 +13,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.gvagdas.closetly",
+      "appleTeamId": "Z47YFZ63B6",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       },
@@ -52,7 +53,10 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Closetly uses your location to show weather-based outfit suggestions."
+          "locationWhenInUsePermission": "Closetly uses your location to show weather-based outfit suggestions.",
+          "locationAlwaysAndWhenInUsePermission": false,
+          "locationAlwaysPermission": false,
+          "motionUsagePermission": false
         }
       ],
       "expo-image",
