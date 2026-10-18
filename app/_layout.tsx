@@ -73,6 +73,10 @@ function AuthGate() {
         options={{ presentation: "modal", headerShown: true, title: "Edit item" }}
       />
       <Stack.Screen
+        name="season-swap"
+        options={{ presentation: "modal", headerShown: true, title: "Season swap" }}
+      />
+      <Stack.Screen
         name="outfits/suggest"
         options={{ presentation: "modal", headerShown: true, title: "Outfit ideas" }}
       />

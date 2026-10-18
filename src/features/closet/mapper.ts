@@ -29,9 +29,17 @@ export function itemFromRow(row: ItemRow): Item {
     purchasedOn: row.purchased_on,
     timesWashed: row.times_washed,
     inWash: row.in_wash,
+    storedAt: storedAtFromRow(row.stored_at),
     created_at: row.created_at,
   };
 }
+
+// Normalises a missing column (app build ahead of the migration) to "in the
+// closet" rather than letting `undefined` read as stored.
+const storedAtFromRow = (raw: ItemRow["stored_at"] | undefined): string | null => {
+  if (!raw) return null;
+  return raw;
+};
 
 const rowColors = (raw: ItemRow["colors"]): ItemColor[] => {
   if (!raw) return [];

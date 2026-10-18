@@ -5,18 +5,42 @@ import { Text } from "~/components/ui/Text";
 type Props = {
   hasAnyItems: boolean;
   hasActiveFilters: boolean;
+  storedCount: number;
   onClearFilters: () => void;
 };
 
 export function ClosetEmptyState({
   hasAnyItems,
   hasActiveFilters,
+  storedCount,
   onClearFilters,
 }: Props) {
   if (hasAnyItems && hasActiveFilters) {
     return <FilteredEmpty onClearFilters={onClearFilters} />;
   }
+  if (storedCount > 0) return <AllStoredEmpty />;
   return <UnpopulatedEmpty />;
+}
+
+function AllStoredEmpty() {
+  return (
+    <View className="flex-1 items-center justify-center px-12">
+      <Text variant="title" className="text-center mb-2">
+        Everything is in storage
+      </Text>
+      <Text variant="caption" className="text-center mb-6">
+        Run a season swap to bring the right pieces back out.
+      </Text>
+      <Pressable
+        onPress={() => router.push("/season-swap")}
+        className="h-12 px-6 rounded-lg bg-ink dark:bg-ink-dark items-center justify-center"
+      >
+        <Text className="text-canvas dark:text-canvas-dark font-medium">
+          Season swap
+        </Text>
+      </Pressable>
+    </View>
+  );
 }
 
 function FilteredEmpty({ onClearFilters }: { onClearFilters: () => void }) {

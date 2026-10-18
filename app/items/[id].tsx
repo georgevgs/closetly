@@ -15,6 +15,9 @@ import { useItem, useDeleteItem } from "~/features/closet/hooks/useItems";
 import { ItemDetailSkeleton } from "~/features/closet/components/ItemDetailSkeleton";
 import { useMarkWashed } from "~/features/closet/hooks/useMarkWashed";
 import { useToggleInWash } from "~/features/closet/hooks/useToggleInWash";
+import { useSetItemsStored } from "~/features/closet/hooks/useSetItemsStored";
+import { StorageSection } from "~/features/closet/components/StorageSection";
+import { isStored } from "~/lib/itemAvailability";
 import { signFirst } from "~/features/closet/itemPicker";
 import { useQuery } from "@tanstack/react-query";
 import { foregroundFor } from "~/lib/utils";
@@ -26,6 +29,7 @@ export default function ItemDetail() {
   const del = useDeleteItem();
   const markWashed = useMarkWashed();
   const toggleInWash = useToggleInWash();
+  const setItemsStored = useSetItemsStored();
   const { colorScheme } = useColorScheme();
   const foreground = foregroundFor(colorScheme);
 
@@ -137,6 +141,18 @@ export default function ItemDetail() {
               { itemId: display.id, inWash: nextInWash },
               { onSuccess: () => toast.success(washStatusToastFor(nextInWash)) },
             );
+          }}
+        />
+
+        <StorageSection
+          item={display}
+          updating={setItemsStored.isPending}
+          onToggleStored={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            const willStore = !isStored(display);
+            setItemsStored.mutate(storageMovesFor(display.id, willStore), {
+              onSuccess: () => toast.success(storageToastFor(willStore)),
+            });
           }}
         />
 
@@ -273,13 +289,16 @@ function EditItemHeaderButton({
   );
 }
 
+// The signed copy is cached once per item id, so it goes stale when status
+// toggles (wash, storage) patch the item query. Take every field from the
+// live item and only the photo URLs from the signed copy.
 const displayItem = (
   signed: Item | null | undefined,
-  fallback: Item | null | undefined,
+  live: Item | null | undefined,
 ): Item | undefined => {
-  if (signed) return signed;
-  if (fallback) return fallback;
-  return undefined;
+  if (!live) return undefined;
+  if (!signed) return live;
+  return { ...live, photo_url: signed.photo_url, thumb_url: signed.thumb_url };
 };
 
 const titleFor = (item: Item): string => {
@@ -318,6 +337,16 @@ const inWashToggleLabel = (inWash: boolean, pending: boolean): string => {
   if (pending) return "Updating…";
   if (inWash) return "Back in rotation";
   return "Send to wash";
+};
+
+const storageMovesFor = (itemId: string, willStore: boolean) => {
+  if (willStore) return { storeItemIds: [itemId], returnItemIds: [] };
+  return { storeItemIds: [], returnItemIds: [itemId] };
+};
+
+const storageToastFor = (willStore: boolean): string => {
+  if (willStore) return "Stored away — hidden from suggestions";
+  return "Back in your closet";
 };
 
 const washStatusToastFor = (inWash: boolean): string => {

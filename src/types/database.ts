@@ -43,6 +43,7 @@ export type Database = {
           price: number | null
           purchased_on: string | null
           seasons: Database["public"]["Enums"]["season_tag"][]
+          stored_at: string | null
           styles: Database["public"]["Enums"]["style_tag"][]
           thumb_path: string | null
           times_washed: number
@@ -69,6 +70,7 @@ export type Database = {
           price?: number | null
           purchased_on?: string | null
           seasons?: Database["public"]["Enums"]["season_tag"][]
+          stored_at?: string | null
           styles?: Database["public"]["Enums"]["style_tag"][]
           thumb_path?: string | null
           times_washed?: number
@@ -215,6 +217,13 @@ export type Database = {
           p_item_id: string
         }
         Returns: number
+      }
+      apply_season_swap: {
+        Args: {
+          p_store_ids: string[]
+          p_return_ids: string[]
+        }
+        Returns: void
       }
     }
     Enums: {

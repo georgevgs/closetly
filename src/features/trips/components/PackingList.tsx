@@ -8,6 +8,7 @@ import { Card } from "~/components/ui/Card";
 import { PressableScale } from "~/components/ui/PressableScale";
 import { CATEGORIES, type Category, type Item } from "~/types/items";
 import { cn } from "~/lib/utils";
+import { isStored } from "~/lib/itemAvailability";
 import { intentColors, radii } from "~/lib/designTokens";
 import type { TripItemEntry } from "~/features/trips/hooks/useTrip";
 
@@ -193,8 +194,12 @@ const itemDisplayName = (item: Item): string => {
   return CATEGORY_LABELS[item.category];
 };
 
+// Trips can call for off-season pieces (shorts for a winter beach trip), so
+// the capsule still includes stored items — flag them so the user knows to
+// dig them out of storage before packing.
 const itemSubline = (item: Item): string => {
   const parts: string[] = [];
+  if (isStored(item)) parts.push("in storage");
   if (item.brand) parts.push(item.brand);
   if (item.colors[0]) parts.push(item.colors[0].hex);
   if (parts.length === 0) return item.category;

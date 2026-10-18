@@ -25,6 +25,7 @@ import { ClosetEmptyState } from "~/features/closet/components/ClosetEmptyState"
 import { ClosetGridSkeleton } from "~/features/closet/components/ClosetGridSkeleton";
 import { useSignedItems } from "~/features/closet/hooks/useSignedItems";
 import { useToggleInWash } from "~/features/closet/hooks/useToggleInWash";
+import { onlyStored, withoutStored } from "~/lib/itemAvailability";
 import { useAuth } from "~/features/auth/context";
 import { useCategoryPrefs } from "~/providers/CategoryPrefsProvider";
 import { useDebouncedValue } from "~/hooks/useDebouncedValue";
@@ -69,6 +70,7 @@ export default function ClosetScreen() {
   const [filter, setFilter] = useState<Category | "all">("all");
   const [sort, setSort] = useState<SortMode>("newest");
   const [filters, setFilters] = useState<ClosetFilters>(emptyClosetFilters);
+  const [isShowingStored, setIsShowingStored] = useState(false);
   const [chromeHeight, setChromeHeight] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const filterSheetRef = useRef<BottomSheetModal>(null);
@@ -94,12 +96,18 @@ export default function ClosetScreen() {
     [filters, debouncedSearchText],
   );
 
+  const storedCount = storedItemCount(items);
+  // Falls back to the closet view on its own once the last stored piece is
+  // brought out, so the user isn't left staring at an empty "Stored" shelf.
+  const showsStoredShelf = isShowingStored && storedCount > 0;
+
   const visibleItems = useMemo(() => {
     if (!items) return [];
-    const filtered = applyClosetFilters(items, filtersForApply);
+    const shelf = itemsOnShelf(items, showsStoredShelf);
+    const filtered = applyClosetFilters(shelf, filtersForApply);
     const byCategory = filterByCategory(filtered, effectiveFilter);
     return sortItems(byCategory, sort);
-  }, [items, filtersForApply, effectiveFilter, sort]);
+  }, [items, showsStoredShelf, filtersForApply, effectiveFilter, sort]);
 
   const totalCount = totalItemCount(items);
   const activeTags = listActiveTags(filters);
@@ -171,6 +179,7 @@ export default function ClosetScreen() {
         items={visibleItems}
         hasAnyItems={totalCount > 0}
         hasActiveFilters={hasActiveFilters}
+        storedCount={storedCount}
         chromeHeight={chromeHeight}
         bottomPadding={insets.bottom + 40}
         isRefreshing={isRefreshing}
@@ -201,6 +210,9 @@ export default function ClosetScreen() {
           visibleCategories={visibleCategories}
           activeCategory={effectiveFilter}
           onSelectCategory={setFilter}
+          storedCount={storedCount}
+          showsStoredShelf={showsStoredShelf}
+          onToggleStoredShelf={() => setIsShowingStored(!showsStoredShelf)}
         />
       </View>
       <ClosetFilterSheet
@@ -224,6 +236,9 @@ function ChromeOverlay({
   visibleCategories,
   activeCategory,
   onSelectCategory,
+  storedCount,
+  showsStoredShelf,
+  onToggleStoredShelf,
 }: {
   sort: SortMode;
   onCycleSort: () => void;
@@ -235,6 +250,9 @@ function ChromeOverlay({
   visibleCategories: Category[];
   activeCategory: Category | "all";
   onSelectCategory: (next: Category | "all") => void;
+  storedCount: number;
+  showsStoredShelf: boolean;
+  onToggleStoredShelf: () => void;
 }) {
   return (
     <View>
@@ -264,6 +282,13 @@ function ChromeOverlay({
           />
           <FloatingChromeGroup spacing={6}>
             <CircularGlassButton
+              symbol="arrow.triangle.2.circlepath"
+              symbolSize={symbolStyles.chromePrimary.size}
+              foreground={foreground}
+              accessibilityLabel="Season swap"
+              onPress={openSeasonSwap}
+            />
+            <CircularGlassButton
               symbol="square.grid.2x2"
               symbolSize={symbolStyles.chromePrimary.size}
               foreground={foreground}
@@ -291,6 +316,9 @@ function ChromeOverlay({
         visibleCategories={visibleCategories}
         active={activeCategory}
         onSelect={onSelectCategory}
+        storedCount={storedCount}
+        showsStoredShelf={showsStoredShelf}
+        onToggleStoredShelf={onToggleStoredShelf}
       />
     </View>
   );
@@ -319,6 +347,11 @@ const openBuildOutfit = () => {
   router.push("/outfits/build");
 };
 
+const openSeasonSwap = () => {
+  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  router.push("/season-swap");
+};
+
 const openNewItem = () => {
   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   router.push("/items/new");
@@ -327,6 +360,16 @@ const openNewItem = () => {
 const totalItemCount = (items: Item[] | undefined): number => {
   if (!items) return 0;
   return items.length;
+};
+
+const storedItemCount = (items: Item[] | undefined): number => {
+  if (!items) return 0;
+  return onlyStored(items).length;
+};
+
+const itemsOnShelf = (items: Item[], showsStoredShelf: boolean): Item[] => {
+  if (showsStoredShelf) return onlyStored(items);
+  return withoutStored(items);
 };
 
 function SearchAndFilterBar({
@@ -369,10 +412,16 @@ function CategoryRow({
   visibleCategories,
   active,
   onSelect,
+  storedCount,
+  showsStoredShelf,
+  onToggleStoredShelf,
 }: {
   visibleCategories: Category[];
   active: Category | "all";
   onSelect: (next: Category | "all") => void;
+  storedCount: number;
+  showsStoredShelf: boolean;
+  onToggleStoredShelf: () => void;
 }) {
   return (
     <ScrollView
@@ -385,6 +434,13 @@ function CategoryRow({
         gap: spacing.groupGap,
       }}
     >
+      {storedCount > 0 && (
+        <Pill
+          label={`Stored · ${storedCount}`}
+          selected={showsStoredShelf}
+          onPress={onToggleStoredShelf}
+        />
+      )}
       <Pill label="All" selected={active === "all"} onPress={() => onSelect("all")} />
       {visibleCategories.map((category) => (
         <Pill
@@ -403,6 +459,7 @@ function ClosetBody({
   items,
   hasAnyItems,
   hasActiveFilters,
+  storedCount,
   chromeHeight,
   bottomPadding,
   isRefreshing,
@@ -415,6 +472,7 @@ function ClosetBody({
   items: Item[];
   hasAnyItems: boolean;
   hasActiveFilters: boolean;
+  storedCount: number;
   chromeHeight: number;
   bottomPadding: number;
   isRefreshing: boolean;
@@ -435,6 +493,7 @@ function ClosetBody({
         <ClosetEmptyState
           hasAnyItems={hasAnyItems}
           hasActiveFilters={hasActiveFilters}
+          storedCount={storedCount}
           onClearFilters={onClearEverything}
         />
       </Animated.View>

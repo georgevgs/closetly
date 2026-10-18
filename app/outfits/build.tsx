@@ -29,6 +29,7 @@ import { OutfitActionBar } from "~/features/outfits/components/OutfitActionBar";
 import { useBottomBarSpacing } from "~/components/ui/BottomBar";
 import { toWeatherContext } from "~/features/outfits/weatherContext";
 import { scoreOutfit, type ScoreBreakdown } from "~/lib/outfit/score";
+import { withoutStored } from "~/lib/itemAvailability";
 import type { Category, Item } from "~/types/items";
 
 const DEFAULT_VISIBLE_SLOTS: Category[] = ["top", "bottom", "shoes", "outerwear"];
@@ -337,9 +338,11 @@ const trimmedNameOrUndefined = (raw: string): string | undefined => {
   return trimmed;
 };
 
+// Stored pieces are packed away for the off-season, so they can't be part
+// of an outfit put together for today.
 const candidateItemsFor = (items: Item[] | undefined): Item[] => {
   if (!items) return [];
-  return items;
+  return withoutStored(items);
 };
 
 const lookupCurrent = (

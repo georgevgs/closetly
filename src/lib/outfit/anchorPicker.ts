@@ -1,6 +1,7 @@
 import type { Item, Category, Occasion } from "../../types/items";
 import { RECENCY, recencyPenaltyForDaysAgo } from "../../features/outfits/tuning";
 import type { WeatherContext } from "./score";
+import { isAvailableToWear } from "../itemAvailability";
 
 // A "today" outfit is best anchored on the piece that defines the silhouette.
 // Bottoms and dresses do that more strongly than tops or shoes.
@@ -33,10 +34,11 @@ export const pickAnchorsForToday = (opts: AnchorPickerOptions): Item[] => {
   return ranked.slice(0, count).map((entry) => entry.item);
 };
 
-// Items the user has flagged as in the laundry shouldn't be offered as
-// anchors — same intent as filtering archived rows out at the data layer.
+// Pieces in the laundry or packed away for the off-season shouldn't be
+// offered as anchors — same intent as filtering archived rows out at the
+// data layer.
 const filterAvailable = (closet: Item[]): Item[] => {
-  return closet.filter((item) => !item.inWash);
+  return closet.filter(isAvailableToWear);
 };
 
 const filterByOccasion = (

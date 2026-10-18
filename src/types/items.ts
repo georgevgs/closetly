@@ -93,6 +93,7 @@ export type Item = {
   purchasedOn: string | null;
   timesWashed: number;
   inWash: boolean;
+  storedAt: string | null;
   created_at: string;
 };
 

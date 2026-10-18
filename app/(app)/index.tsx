@@ -25,6 +25,8 @@ import {
 } from "~/features/profile/stylePreferences";
 import { TodayOutfitsSection } from "~/features/outfits/components/TodayOutfitsSection";
 import { LocationPrompt } from "~/features/weather/components/LocationPrompt";
+import { SeasonSwapPrompt } from "~/features/closet/components/SeasonSwapPrompt";
+import { withoutStored } from "~/lib/itemAvailability";
 import {
   assessClosetViability,
   type ClosetViability,
@@ -67,15 +69,20 @@ export default function TodayScreen() {
     setIsRefreshing(false);
   };
 
-  const anchorCandidates = useMemo(() => {
-    if (!items) return [];
-    return sortByAnchorPriority(items);
+  const closetItems = useMemo(() => {
+    if (!items) return null;
+    return withoutStored(items);
   }, [items]);
 
+  const anchorCandidates = useMemo(() => {
+    if (!closetItems) return [];
+    return sortByAnchorPriority(closetItems);
+  }, [closetItems]);
+
   const viability = useMemo(() => {
-    if (!items) return null;
-    return assessClosetViability(items);
-  }, [items]);
+    if (!closetItems) return null;
+    return assessClosetViability(closetItems);
+  }, [closetItems]);
 
   return (
     <Screen>
@@ -94,6 +101,7 @@ export default function TodayScreen() {
       >
         <Greeting weather={weather} />
         <LocationPrompt />
+        {items && <SeasonSwapPrompt items={items} />}
         <HomeBody
           isLoading={isLoading}
           viability={viability}

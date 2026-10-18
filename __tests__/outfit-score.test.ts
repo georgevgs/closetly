@@ -44,6 +44,7 @@ const buildItem = (overrides: ItemOverrides): Item => {
     purchasedOn: null,
     timesWashed: 0,
     inWash: false,
+    storedAt: null,
     created_at: "2026-01-01T00:00:00Z",
   };
 };

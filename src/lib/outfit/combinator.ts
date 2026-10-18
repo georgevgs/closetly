@@ -1,5 +1,6 @@
 import type { Item, Category, Occasion, Style } from "../../types/items";
 import { scoreOutfit, type ScoreBreakdown, type WeatherContext } from "./score";
+import { isAvailableToWear } from "../itemAvailability";
 
 export type OutfitSuggestion = {
   items: Item[];
@@ -112,13 +113,14 @@ const trimCandidates = (
   });
 };
 
-// Pieces flagged as in the wash are unavailable — the user can't actually
-// wear them today. The anchor is exempt because the user picked it
-// explicitly (e.g. tapping "find outfits with this" from item detail).
+// Pieces in the wash or in seasonal storage are unavailable — the user
+// can't actually wear them today. The anchor is exempt because the user
+// picked it explicitly (e.g. tapping "find outfits with this" from item
+// detail).
 const filterAvailable = (closet: Item[], anchor: Item): Item[] => {
   return closet.filter((item) => {
     if (item.id === anchor.id) return true;
-    return !item.inWash;
+    return isAvailableToWear(item);
   });
 };
 
